@@ -1,10 +1,14 @@
 package com.hyfixes;
 
+import com.hyfixes.commands.ChunkStatusCommand;
+import com.hyfixes.commands.ChunkUnloadCommand;
 import com.hyfixes.listeners.EmptyArchetypeSanitizer;
 import com.hyfixes.listeners.InstancePositionTracker;
 import com.hyfixes.listeners.PickupItemSanitizer;
 import com.hyfixes.listeners.ProcessingBenchSanitizer;
 import com.hyfixes.listeners.RespawnBlockSanitizer;
+import com.hyfixes.systems.ChunkCleanupSystem;
+import com.hyfixes.systems.ChunkUnloadManager;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
 
@@ -23,11 +27,14 @@ import java.util.logging.Level;
  * - ProcessingBenchSanitizer: Prevents crash when breaking processing benches with open windows
  * - EmptyArchetypeSanitizer: Monitors for entities with invalid state (empty archetypes)
  * - InstancePositionTracker: Prevents kick when exiting instances with missing return world
+ * - ChunkUnloadManager: Aggressively unloads chunks to prevent memory bloat (v1.2.0)
  */
 public class HyFixes extends JavaPlugin {
 
     private static HyFixes instance;
     private InstancePositionTracker instancePositionTracker;
+    private ChunkUnloadManager chunkUnloadManager;
+    private ChunkCleanupSystem chunkCleanupSystem;
 
     public HyFixes(@Nonnull JavaPluginInit init) {
         super(init);
@@ -71,6 +78,30 @@ public class HyFixes extends JavaPlugin {
         instancePositionTracker = new InstancePositionTracker(this);
         instancePositionTracker.register();
         getLogger().at(Level.INFO).log("[FIX] InstancePositionTracker registered - prevents crash when exiting instances with missing return world");
+
+        // Fix 6: Chunk memory bloat - chunks not unloading (v1.2.0)
+        // Uses reflection to discover and call chunk unload APIs
+        chunkUnloadManager = new ChunkUnloadManager(this);
+
+        // Fix 6b: Main-thread chunk cleanup system (v1.2.2)
+        // Runs cleanup methods on the main server thread to avoid InvocationTargetException
+        chunkCleanupSystem = new ChunkCleanupSystem(this);
+        getEntityStoreRegistry().registerSystem(chunkCleanupSystem);
+        getLogger().at(Level.INFO).log("[FIX] ChunkCleanupSystem registered - runs cleanup on main thread");
+
+        // Wire up the systems
+        chunkUnloadManager.setChunkCleanupSystem(chunkCleanupSystem);
+        chunkUnloadManager.start();
+        getLogger().at(Level.INFO).log("[FIX] ChunkUnloadManager registered - aggressively unloads unused chunks");
+
+        // Register admin commands
+        registerCommands();
+    }
+
+    private void registerCommands() {
+        getCommandRegistry().registerCommand(new ChunkStatusCommand(this));
+        getCommandRegistry().registerCommand(new ChunkUnloadCommand(this));
+        getLogger().at(Level.INFO).log("[CMD] Registered /chunkstatus and /chunkunload commands");
     }
 
     @Override
@@ -80,14 +111,32 @@ public class HyFixes extends JavaPlugin {
 
     @Override
     protected void shutdown() {
+        // Stop the chunk unload manager
+        if (chunkUnloadManager != null) {
+            chunkUnloadManager.stop();
+        }
         getLogger().at(Level.INFO).log("HyFixes has been disabled.");
     }
 
     private int getFixCount() {
-        return 5; // PickupItemSanitizer, RespawnBlockSanitizer, ProcessingBenchSanitizer, EmptyArchetypeSanitizer, InstancePositionTracker
+        return 7; // PickupItemSanitizer, RespawnBlockSanitizer, ProcessingBenchSanitizer, EmptyArchetypeSanitizer, InstancePositionTracker, ChunkUnloadManager, ChunkCleanupSystem
     }
 
     public static HyFixes getInstance() {
         return instance;
+    }
+
+    /**
+     * Get the ChunkUnloadManager for commands and status.
+     */
+    public ChunkUnloadManager getChunkUnloadManager() {
+        return chunkUnloadManager;
+    }
+
+    /**
+     * Get the ChunkCleanupSystem for commands and status.
+     */
+    public ChunkCleanupSystem getChunkCleanupSystem() {
+        return chunkCleanupSystem;
     }
 }
