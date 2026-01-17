@@ -16,7 +16,14 @@ Each bug includes:
 
 ## Table of Contents
 
-1. [InteractionChain Sync Buffer Overflow](#1-interactionchain-sync-buffer-overflow-critical)
+### Fixed via HyFixes Early Plugin (Bytecode Patches)
+1. [InteractionChain Sync Buffer Overflow](#1-interactionchain-sync-buffer-overflow-critical) - **FIXED**
+2. [World.addPlayer() Race Condition](#5-worldaddplayer-race-condition-critical) - **FIXED**
+3. [SpawnReferenceSystems Null Controller](#6-spawnreferencesystems-null-controller-critical) - **FIXED**
+4. [BeaconSpawnController Null Spawn](#7-beaconspawncontroller-null-spawn-critical) - **FIXED**
+5. [BlockComponentChunk Duplicate Components](#8-blockcomponentchunk-duplicate-components-critical) - **FIXED**
+
+### Requires Hytale Developers
 2. [Missing Replacement Interactions](#2-missing-replacement-interactions-medium)
 3. [Client/Server Interaction Desync](#3-clientserver-interaction-desync-medium)
 4. [World Task Queue Silent NPE](#4-world-task-queue-silent-npe-low)
@@ -24,6 +31,8 @@ Each bug includes:
 ---
 
 ## 1. InteractionChain Sync Buffer Overflow (CRITICAL)
+
+> **STATUS: FIXED** - HyFixes Early Plugin v1.0.0+ patches this via bytecode transformation
 
 ### Summary
 
@@ -354,6 +363,111 @@ catch (NullPointerException e) {
 
 2. Add null checks in task execution
 3. Defer tasks until component initialization is complete
+
+---
+
+## 5. World.addPlayer() Race Condition (CRITICAL)
+
+> **STATUS: FIXED** - HyFixes Early Plugin v1.4.1+ patches this via bytecode transformation
+
+### Summary
+
+Hytale's `World.addPlayer()` throws an exception when a player enters an instance portal but hasn't been fully removed from their previous world yet.
+
+### Error Pattern
+
+```
+java.lang.IllegalStateException: Player is already in a world
+    at World.addPlayer(World.java:1008)
+    at InstancesPlugin.teleportPlayerToLoadingInstance(InstancesPlugin.java:403)
+```
+
+### Root Cause
+
+The `InstancesPlugin.teleportPlayerToLoadingInstance()` method uses async/CompletableFuture code that has a race condition between draining the player from one world and adding them to another.
+
+### HyFixes Bytecode Fix
+
+The early plugin transforms `World.addPlayer()` to log a warning and continue instead of throwing, allowing Hytale's drain logic to clean up the stale reference.
+
+---
+
+## 6. SpawnReferenceSystems Null Controller (CRITICAL)
+
+> **STATUS: FIXED** - HyFixes Early Plugin v1.4.1+ patches this via bytecode transformation
+
+### Summary
+
+Hytale's `SpawnReferenceSystems$BeaconAddRemoveSystem.onEntityAdded()` crashes when `getSpawnController()` returns null.
+
+### Error Pattern
+
+```
+java.lang.NullPointerException: Cannot invoke "SpawnController.registerBeacon(Ref)"
+because "spawnController" is null
+    at SpawnReferenceSystems$BeaconAddRemoveSystem.onEntityAdded(SpawnReferenceSystems.java:84)
+```
+
+### Root Cause
+
+Spawn beacons can reference spawn controllers that don't exist or haven't loaded yet, causing `getSpawnController()` to return null.
+
+### HyFixes Bytecode Fix
+
+The early plugin injects a null check after the `getSpawnController()` call and returns early if null.
+
+---
+
+## 7. BeaconSpawnController Null Spawn (CRITICAL)
+
+> **STATUS: FIXED** - HyFixes Early Plugin v1.4.4+ patches this via bytecode transformation
+
+### Summary
+
+Hytale's `BeaconSpawnController.createRandomSpawnJob()` crashes when `getRandomSpawn()` returns null.
+
+### Error Pattern
+
+```
+java.lang.NullPointerException: Cannot invoke "RoleSpawnParameters.getId()"
+because "spawn" is null
+    at BeaconSpawnController.createRandomSpawnJob(BeaconSpawnController.java:110)
+```
+
+### Root Cause
+
+Spawn beacons in volcanic/cave biomes can have misconfigured or missing spawn types. When `getRandomSpawn()` returns null, the subsequent `spawn.getId()` call crashes.
+
+### HyFixes Bytecode Fix
+
+The early plugin detects method calls returning `RoleSpawnParameters` and injects a null check after the result is stored to a local variable.
+
+---
+
+## 8. BlockComponentChunk Duplicate Components (CRITICAL)
+
+> **STATUS: FIXED** - HyFixes Early Plugin v1.4.3+ patches this via bytecode transformation
+
+### Summary
+
+Hytale's `BlockComponentChunk.addEntityReference()` throws an exception when a duplicate block component is detected, instead of handling it gracefully.
+
+### Error Pattern
+
+```
+java.lang.IllegalArgumentException: Duplicate block components at: 153349
+    at BlockComponentChunk.addEntityReference(BlockComponentChunk.java:329)
+    at BlockModule$BlockStateInfoRefSystem.onEntityAdded(BlockModule.java:334)
+    at TeleporterSettingsPageSupplier.tryCreate(TeleporterSettingsPageSupplier.java:81)
+```
+
+### Root Cause
+
+When interacting with teleporters, Hytale sometimes tries to add a block component entity reference that already exists. Instead of being idempotent, it throws.
+
+### HyFixes Bytecode Fix
+
+The early plugin transforms `addEntityReference()` to log a warning and return instead of throwing, making it idempotent.
 
 ---
 

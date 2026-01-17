@@ -473,6 +473,145 @@ The bytecode transformation intercepts the `ATHROW` instruction for the "Player 
 
 ---
 
+### 16. SpawnReferenceSystems Null SpawnController Crash (v1.4.1-early)
+
+**Severity:** Critical - Crashes world thread when spawn beacons load
+
+**The Bug:**
+
+GitHub Issue: https://github.com/John-Willikers/hyfixes/issues/4
+
+Hytale's `SpawnReferenceSystems$BeaconAddRemoveSystem.onEntityAdded()` calls `getSpawnController()` without null-checking the result:
+
+```java
+// Original buggy code
+SpawnController controller = getSpawnController(componentAccessor);
+controller.registerBeacon(ref);  // CRASH if controller is null!
+```
+
+Error seen in logs:
+```
+java.lang.NullPointerException: Cannot invoke "SpawnController.registerBeacon(Ref)"
+because "spawnController" is null
+    at SpawnReferenceSystems$BeaconAddRemoveSystem.onEntityAdded(SpawnReferenceSystems.java:84)
+```
+
+**Root Cause:**
+
+Spawn beacons can reference spawn controllers that don't exist or haven't loaded yet, causing `getSpawnController()` to return null.
+
+**Impact:** World thread crashes when loading chunks with orphan spawn beacons.
+
+**The Fix:**
+
+The early plugin injects a null check after the `getSpawnController()` call:
+
+```java
+// Fixed - check for null before using
+SpawnController controller = getSpawnController(componentAccessor);
+if (controller == null) {
+    System.out.println("[HyFixes-Early] WARNING: null spawnController, skipping beacon registration");
+    return;
+}
+controller.registerBeacon(ref);
+```
+
+---
+
+### 17. BeaconSpawnController Null Spawn Parameters Crash (v1.4.2-early, fixed v1.4.4)
+
+**Severity:** Critical - Crashes world thread in volcanic/cave biomes
+
+**The Bug:**
+
+GitHub Issue: https://github.com/John-Willikers/hyfixes/issues/4
+
+Hytale's `BeaconSpawnController.createRandomSpawnJob()` calls `getRandomSpawn()` which can return null when spawn types are misconfigured:
+
+```java
+// Original buggy code
+RoleSpawnParameters spawn = getRandomSpawn(accessor);
+spawn.getId();  // CRASH if spawn is null!
+```
+
+Error seen in logs:
+```
+java.lang.NullPointerException: Cannot invoke "RoleSpawnParameters.getId()"
+because "spawn" is null
+    at BeaconSpawnController.createRandomSpawnJob(BeaconSpawnController.java:110)
+```
+
+**Root Cause:**
+
+Spawn beacons in volcanic/cave biomes can have misconfigured or missing spawn types. When `getRandomSpawn()` returns null, the subsequent `spawn.getId()` call crashes.
+
+**Impact:** World thread crashes when players explore volcanic/red cave biomes with spawn beacon issues.
+
+**The Fix:**
+
+The early plugin detects when a method returns `RoleSpawnParameters` and the result is stored to a local variable. It injects a null check after the assignment:
+
+```java
+// Fixed - check for null after assignment
+RoleSpawnParameters spawn = getRandomSpawn(accessor);
+if (spawn == null) {
+    System.out.println("[HyFixes-Early] WARNING: null spawn, returning null");
+    return null;
+}
+spawn.getId();  // Safe now
+```
+
+**Note:** v1.4.2 had a bug where we checked the wrong variable (method parameter instead of local variable). This was fixed in v1.4.4.
+
+---
+
+### 18. BlockComponentChunk Duplicate Block Components Crash (v1.4.3-early)
+
+**Severity:** Critical - Kicks player when using teleporters
+
+**The Bug:**
+
+GitHub Issue: https://github.com/John-Willikers/hyfixes/issues/8
+
+Hytale's `BlockComponentChunk.addEntityReference()` throws an exception when a duplicate block component is detected:
+
+```java
+// Original buggy code
+if (existingRef != null) {
+    throw new IllegalArgumentException("Duplicate block components at: " + position);
+}
+```
+
+Error seen in logs:
+```
+java.lang.IllegalArgumentException: Duplicate block components at: 153349
+    at BlockComponentChunk.addEntityReference(BlockComponentChunk.java:329)
+    at BlockModule$BlockStateInfoRefSystem.onEntityAdded(BlockModule.java:334)
+    at TeleporterSettingsPageSupplier.tryCreate(TeleporterSettingsPageSupplier.java:81)
+```
+
+**Root Cause:**
+
+When interacting with teleporters, Hytale sometimes tries to add a block component entity reference that already exists. Instead of handling this gracefully, it throws an exception.
+
+**Impact:** Player is kicked when interacting with teleporters.
+
+**The Fix:**
+
+The early plugin transforms `addEntityReference()` to be idempotent - it logs a warning and returns instead of throwing:
+
+```java
+// Fixed - ignore duplicates gracefully
+if (existingRef != null) {
+    System.out.println("[HyFixes-Early] WARNING: Duplicate block component, ignoring");
+    return;  // Instead of throw
+}
+```
+
+The bytecode transformation detects the "Duplicate block components" string pattern and replaces the subsequent `ATHROW` instruction with `POP` + warning log + `RETURN`.
+
+---
+
 ## Technical Reference
 
 ### Runtime Plugin Systems
@@ -501,6 +640,9 @@ The bytecode transformation intercepts the `ATHROW` instruction for the "Player 
 | InteractionChainTransformer | `InteractionChain` | `putInteractionSyncData` | Full method replacement |
 | InteractionChainTransformer | `InteractionChain` | `updateSyncPosition` | Full method replacement |
 | WorldTransformer | `World` | `addPlayer` | Exception throw replaced with warning log |
+| SpawnReferenceSystemsTransformer | `SpawnReferenceSystems$BeaconAddRemoveSystem` | `onEntityAdded` | Null check injection after `getSpawnController()` |
+| BeaconSpawnControllerTransformer | `BeaconSpawnController` | `createRandomSpawnJob` | Null check injection after `getRandomSpawn()` |
+| BlockComponentChunkTransformer | `BlockComponentChunk` | `addEntityReference` | Exception throw replaced with warning log |
 
 ---
 

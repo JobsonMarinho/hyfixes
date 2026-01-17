@@ -56,6 +56,10 @@ Fixes deep networking bugs that cause combat/interaction desync.
 
 - **Sync Buffer Overflow** - Fixes combat/food/tool desync (400-2500 errors per session)
 - **Sync Position Gap** - Fixes "out of order" exception that kicks players
+- **Instance Portal Race** - Fixes "player already in world" crash when entering portals
+- **Null SpawnController** - Fixes world crashes when spawn beacons load
+- **Null Spawn Parameters** - Fixes world crashes in volcanic/cave biomes
+- **Duplicate Block Components** - Fixes player kicks when using teleporters
 
 ---
 
@@ -73,13 +77,23 @@ Look for these messages in your server log at startup:
 
 ### Early Plugin
 
-Look for these messages in your server log at startup:
+Look for these messages in your server log at startup (5 transformers):
 
 ```
 [HyFixes-Early] Transforming InteractionChain class...
-[HyFixes-Early] Found method: putInteractionSyncData - Applying buffer overflow fix...
-[HyFixes-Early] Found method: updateSyncPosition - Applying sync position fix...
 [HyFixes-Early] InteractionChain transformation COMPLETE!
+
+[HyFixes-Early] Transforming World class...
+[HyFixes-Early] World transformation COMPLETE!
+
+[HyFixes-Early] Transforming SpawnReferenceSystems$BeaconAddRemoveSystem...
+[HyFixes-Early] SpawnReferenceSystems transformation COMPLETE!
+
+[HyFixes-Early] Transforming BeaconSpawnController...
+[HyFixes-Early] BeaconSpawnController transformation COMPLETE!
+
+[HyFixes-Early] Transforming BlockComponentChunk...
+[HyFixes-Early] BlockComponentChunk transformation COMPLETE!
 ```
 
 ---

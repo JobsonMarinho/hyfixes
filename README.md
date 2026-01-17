@@ -62,6 +62,10 @@ Some Hytale bugs occur in code paths that cannot be intercepted at runtime. The 
 |-----|----------|--------------|
 | Sync Buffer Overflow | Critical | Combat/food/tool desync, 400-2500 errors/session |
 | Sync Position Gap | Critical | Player kicked with "out of order" exception |
+| Instance Portal Race | Critical | Player kicked when entering instance portals |
+| Null SpawnController | Critical | World crashes when spawn beacons load |
+| Null Spawn Parameters | Critical | World crashes in volcanic/cave biomes |
+| Duplicate Block Components | Critical | Player kicked when using teleporters |
 
 ---
 
@@ -153,12 +157,22 @@ Look for these log messages at startup:
 
 ### Early Plugin Loaded
 
-Look for these log messages at startup:
+Look for these log messages at startup (5 transformers):
 ```
 [HyFixes-Early] Transforming InteractionChain class...
-[HyFixes-Early] Found method: putInteractionSyncData - Applying buffer overflow fix...
-[HyFixes-Early] Found method: updateSyncPosition - Applying sync position fix...
 [HyFixes-Early] InteractionChain transformation COMPLETE!
+
+[HyFixes-Early] Transforming World class...
+[HyFixes-Early] World transformation COMPLETE!
+
+[HyFixes-Early] Transforming SpawnReferenceSystems$BeaconAddRemoveSystem...
+[HyFixes-Early] SpawnReferenceSystems transformation COMPLETE!
+
+[HyFixes-Early] Transforming BeaconSpawnController...
+[HyFixes-Early] BeaconSpawnController transformation COMPLETE!
+
+[HyFixes-Early] Transforming BlockComponentChunk...
+[HyFixes-Early] BlockComponentChunk transformation COMPLETE!
 ```
 
 ---
