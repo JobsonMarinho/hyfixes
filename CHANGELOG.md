@@ -2,6 +2,19 @@
 
 All notable changes to HyFixes will be documented in this file.
 
+## [1.4.4] - 2026-01-17
+
+### Fixed
+
+#### BeaconSpawnController Transformer Bug (Early Plugin)
+- **Problem:** v1.4.2 transformer was checking the wrong variable for null
+- **Root cause:** The method signature is `createRandomSpawnJob(ComponentAccessor accessor)` - the `spawn` variable is a LOCAL variable, not a parameter
+- **Details:** The original fix checked parameter var 1 (ComponentAccessor), but `spawn` is assigned inside the method from `getRandomSpawn()` call
+- **Fix:** Now detects method calls returning `RoleSpawnParameters`, then injects null check after the result is stored to a local variable
+- **Impact:** Actually prevents the BeaconSpawnController crash now (was ineffective in v1.4.2)
+
+---
+
 ## [1.4.3] - 2026-01-17
 
 ### Added
