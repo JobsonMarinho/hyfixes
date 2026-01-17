@@ -45,10 +45,13 @@ jobs:
       - name: Build Runtime Plugin
         run: ./gradlew build -Pversion=${{ steps.version.outputs.VERSION }}
 
-      - name: Rename Runtime Plugin JAR
+      - name: Copy Runtime Plugin JAR
         run: |
           mkdir -p dist
-          cp build/libs/hyfixes.jar dist/hyfixes.jar
+          # Find the built JAR (handles versioned names like hyfixes-1.4.0.jar)
+          JAR_FILE=$(find build/libs -name "hyfixes*.jar" -type f | head -1)
+          echo "Found JAR: $JAR_FILE"
+          cp "$JAR_FILE" dist/hyfixes.jar
           echo "Runtime plugin: $(ls -la dist/hyfixes.jar)"
 
       # Build Early Plugin
@@ -59,7 +62,10 @@ jobs:
 
       - name: Copy Early Plugin JAR
         run: |
-          cp hyfixes-early/build/libs/hyfixes-early-*.jar dist/hyfixes-early.jar
+          # Find the built JAR (handles versioned names)
+          JAR_FILE=$(find hyfixes-early/build/libs -name "hyfixes-early*.jar" -type f | head -1)
+          echo "Found JAR: $JAR_FILE"
+          cp "$JAR_FILE" dist/hyfixes-early.jar
           echo "Early plugin: $(ls -la dist/hyfixes-early.jar)"
 
       # Create Bundle ZIP
