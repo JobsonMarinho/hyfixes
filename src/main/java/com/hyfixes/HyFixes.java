@@ -15,6 +15,8 @@ import com.hyfixes.listeners.ProcessingBenchSanitizer;
 import com.hyfixes.listeners.RespawnBlockSanitizer;
 import com.hyfixes.listeners.SpawnBeaconSanitizer;
 import com.hyfixes.listeners.SpawnMarkerReferenceSanitizer;
+import com.hyfixes.listeners.ChunkTrackerSanitizer;
+import com.hyfixes.listeners.InstanceTeleportSanitizer;
 import com.hyfixes.systems.ChunkCleanupSystem;
 import com.hyfixes.systems.ChunkUnloadManager;
 import com.hyfixes.systems.InteractionChainMonitor;
@@ -43,6 +45,9 @@ import java.util.logging.Level;
  * - CraftingManagerSanitizer: Prevents crash from stale bench references (v1.3.1)
  * - InteractionManagerSanitizer: Prevents NPE crash when opening crafttables (v1.3.1, Issue #1)
  * - SpawnBeaconSanitizer: Prevents crash from null spawn parameters in BeaconSpawnController (v1.3.7, Issue #4)
+ * - SpawnMarkerReferenceSanitizer: Prevents crash from null npcReferences in SpawnMarkerEntity (v1.3.8, Issue #5)
+ * - ChunkTrackerSanitizer: Prevents crash from invalid PlayerRefs during chunk unload (v1.3.9, Issue #6)
+ * - InstanceTeleportSanitizer: Monitors and handles instance portal race conditions (v1.3.10, Issue #7)
  */
 public class HyFixes extends JavaPlugin {
 
@@ -57,6 +62,8 @@ public class HyFixes extends JavaPlugin {
     private InteractionManagerSanitizer interactionManagerSanitizer;
     private SpawnBeaconSanitizer spawnBeaconSanitizer;
     private SpawnMarkerReferenceSanitizer spawnMarkerReferenceSanitizer;
+    private ChunkTrackerSanitizer chunkTrackerSanitizer;
+    private InstanceTeleportSanitizer instanceTeleportSanitizer;
 
     public HyFixes(@Nonnull JavaPluginInit init) {
         super(init);
@@ -161,6 +168,20 @@ public class HyFixes extends JavaPlugin {
         getEntityStoreRegistry().registerSystem(spawnMarkerReferenceSanitizer);
         getLogger().at(Level.INFO).log("[FIX] SpawnMarkerReferenceSanitizer registered - prevents spawn marker null array crash");
 
+        // Fix 14: ChunkTracker null PlayerRef crash (v1.3.9)
+        // GitHub Issue: https://github.com/John-Willikers/hyfixes/issues/6
+        // Prevents world crash when ChunkTracker has invalid PlayerRefs after player disconnect
+        chunkTrackerSanitizer = new ChunkTrackerSanitizer(this);
+        getEntityStoreRegistry().registerSystem(chunkTrackerSanitizer);
+        getLogger().at(Level.INFO).log("[FIX] ChunkTrackerSanitizer registered - prevents chunk unload crash after player disconnect");
+
+        // Fix 15: Instance teleport race condition (v1.3.10)
+        // GitHub Issue: https://github.com/John-Willikers/hyfixes/issues/7
+        // Monitors and handles race conditions when teleporting to instance worlds
+        instanceTeleportSanitizer = new InstanceTeleportSanitizer(this);
+        instanceTeleportSanitizer.register();
+        getLogger().at(Level.INFO).log("[FIX] InstanceTeleportSanitizer registered - monitors instance portal race conditions");
+
         // Register admin commands
         registerCommands();
     }
@@ -188,7 +209,7 @@ public class HyFixes extends JavaPlugin {
     }
 
     private int getFixCount() {
-        return 14; // PickupItemSanitizer, PickupItemChunkHandler, RespawnBlockSanitizer, ProcessingBenchSanitizer, EmptyArchetypeSanitizer, InstancePositionTracker, ChunkUnloadManager, ChunkCleanupSystem, GatherObjectiveTaskSanitizer, InteractionChainMonitor, CraftingManagerSanitizer, InteractionManagerSanitizer, SpawnBeaconSanitizer, SpawnMarkerReferenceSanitizer
+        return 16; // PickupItemSanitizer, PickupItemChunkHandler, RespawnBlockSanitizer, ProcessingBenchSanitizer, EmptyArchetypeSanitizer, InstancePositionTracker, ChunkUnloadManager, ChunkCleanupSystem, GatherObjectiveTaskSanitizer, InteractionChainMonitor, CraftingManagerSanitizer, InteractionManagerSanitizer, SpawnBeaconSanitizer, SpawnMarkerReferenceSanitizer, ChunkTrackerSanitizer, InstanceTeleportSanitizer
     }
 
     public static HyFixes getInstance() {
@@ -256,5 +277,19 @@ public class HyFixes extends JavaPlugin {
      */
     public SpawnMarkerReferenceSanitizer getSpawnMarkerReferenceSanitizer() {
         return spawnMarkerReferenceSanitizer;
+    }
+
+    /**
+     * Get the ChunkTrackerSanitizer for commands and status.
+     */
+    public ChunkTrackerSanitizer getChunkTrackerSanitizer() {
+        return chunkTrackerSanitizer;
+    }
+
+    /**
+     * Get the InstanceTeleportSanitizer for commands and status.
+     */
+    public InstanceTeleportSanitizer getInstanceTeleportSanitizer() {
+        return instanceTeleportSanitizer;
     }
 }

@@ -7,6 +7,8 @@ import com.hyfixes.listeners.InteractionManagerSanitizer;
 import com.hyfixes.listeners.PickupItemChunkHandler;
 import com.hyfixes.listeners.SpawnBeaconSanitizer;
 import com.hyfixes.listeners.SpawnMarkerReferenceSanitizer;
+import com.hyfixes.listeners.ChunkTrackerSanitizer;
+import com.hyfixes.listeners.InstanceTeleportSanitizer;
 import com.hyfixes.systems.ChunkCleanupSystem;
 import com.hyfixes.systems.ChunkUnloadManager;
 import com.hyfixes.systems.InteractionChainMonitor;
@@ -62,7 +64,7 @@ public class InteractionStatusCommand extends AbstractPlayerCommand {
 
         // Header
         sendMessage(player, "&6========================================");
-        sendMessage(player, "&6         HyFixes v1.3.8 Status");
+        sendMessage(player, "&6         HyFixes v1.3.10 Status");
         sendMessage(player, "&6========================================");
         sendMessage(player, "");
 
@@ -154,6 +156,30 @@ public class InteractionStatusCommand extends AbstractPlayerCommand {
         if (markerSanitizer != null) {
             sendMessage(player, "&6--- Spawn Marker Reference Sanitizer ---");
             String status = markerSanitizer.getStatus();
+            for (String line : status.split("\n")) {
+                sendMessage(player, "&7" + line);
+            }
+        }
+
+        sendMessage(player, "");
+
+        // ChunkTrackerSanitizer status (Issue #6)
+        ChunkTrackerSanitizer chunkTrackerSanitizer = plugin.getChunkTrackerSanitizer();
+        if (chunkTrackerSanitizer != null) {
+            sendMessage(player, "&6--- Chunk Tracker Sanitizer ---");
+            String status = chunkTrackerSanitizer.getStatus();
+            for (String line : status.split("\n")) {
+                sendMessage(player, "&7" + line);
+            }
+        }
+
+        sendMessage(player, "");
+
+        // InstanceTeleportSanitizer status (Issue #7)
+        InstanceTeleportSanitizer instanceTeleportSanitizer = plugin.getInstanceTeleportSanitizer();
+        if (instanceTeleportSanitizer != null) {
+            sendMessage(player, "&6--- Instance Teleport Sanitizer ---");
+            String status = instanceTeleportSanitizer.getStatus();
             for (String line : status.split("\n")) {
                 sendMessage(player, "&7" + line);
             }

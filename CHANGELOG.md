@@ -2,6 +2,57 @@
 
 All notable changes to HyFixes will be documented in this file.
 
+## [1.3.10] - 2026-01-17
+
+### Added
+
+#### Instance Teleport Race Condition Fix (Issue #7)
+- **New `InstanceTeleportSanitizer`** - Monitors and handles instance portal race conditions
+- GitHub Issue: https://github.com/John-Willikers/hyfixes/issues/7
+- Error: `IllegalStateException: Player is already in a world`
+- Crash location: `World.addPlayer()` at line 1008, called from `InstancesPlugin.teleportPlayerToLoadingInstance()`
+- Uses event-based monitoring (AddPlayerToWorldEvent, DrainPlayerFromWorldEvent)
+- Tracks instance transitions and detects when players are added to instance worlds without proper drain
+- Status visible in `/interactionstatus` command
+
+### Technical Details
+- Hooks into `AddPlayerToWorldEvent` to detect instance world entries
+- Hooks into `DrainPlayerFromWorldEvent` to track proper player removal sequences
+- Detects race condition when add event occurs without corresponding drain event
+- Logs warnings when race conditions are detected for Hytale bug reporting
+- Tracks pending transitions to coordinate drain/add sequence
+
+### The Bug Explained
+When entering an instance portal (e.g., Forgotten Temple), Hytale's async code has a race condition:
+1. Instance world is created/loaded
+2. Hytale tries to add player to instance world via `World.addPlayer()`
+3. But player hasn't been removed from their current world yet
+4. `World.addPlayer()` checks if player is already in a world and throws `IllegalStateException`
+
+---
+
+## [1.3.9] - 2026-01-17
+
+### Added
+
+#### ChunkTracker Invalid PlayerRef Crash Fix (Issue #6)
+- **New `ChunkTrackerSanitizer`** - Prevents world crash when ChunkTracker has invalid PlayerRefs
+- GitHub Issue: https://github.com/John-Willikers/hyfixes/issues/6
+- Error: `NullPointerException: Cannot invoke "Ref.getStore()" because the return value of "PlayerRef.getReference()" is null`
+- Crash location: `ChunkTracker.tryUnloadChunk()` at line 532
+- Uses reflection-based API discovery to find ChunkTracker components
+- Validates PlayerRefs and removes invalid ones before Hytale's code can crash
+- Status visible in `/interactionstatus` command
+
+### Technical Details
+- Queries for `ChunkTracker` component on Player entities
+- Discovers `PlayerRef.getReference()` method via reflection
+- Scans all fields in ChunkTracker for Collections/Maps containing PlayerRefs
+- Removes entries where `getReference()` returns null (player disconnected)
+- Prevents crash before `PlayerChunkTrackerSystems$UpdateSystem` can iterate invalid refs
+
+---
+
 ## [1.3.8] - 2026-01-17
 
 ### Added
