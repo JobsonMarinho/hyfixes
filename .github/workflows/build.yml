@@ -149,7 +149,7 @@ jobs:
 
             | File | Description |
             |------|-------------|
-            | `hyfixes.jar` | Runtime plugin - place in `plugins/` folder |
+            | `hyfixes.jar` | Runtime plugin - place in `mods/` folder |
             | `hyfixes-early.jar` | Early plugin - place in `earlyplugins/` folder |
             | `hyfixes-bundle-*.zip` | Both plugins + installation instructions |
 
@@ -157,7 +157,7 @@ jobs:
 
             **Runtime Plugin (Required):**
             1. Download `hyfixes.jar`
-            2. Place in your server's `plugins/` folder
+            2. Place in your server's `mods/` folder
             3. Restart the server
 
             **Early Plugin (Recommended):**
@@ -201,7 +201,7 @@ jobs:
                   },
                   {
                     "name": "📥 Installation",
-                    "value": "**Runtime:** `plugins/hyfixes.jar`\n**Early:** `earlyplugins/hyfixes-early.jar`",
+                    "value": "**Runtime:** `mods/hyfixes.jar`\n**Early:** `earlyplugins/hyfixes-early.jar`",
                     "inline": false
                   }
                 ],
