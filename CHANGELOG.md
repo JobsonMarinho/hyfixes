@@ -2,6 +2,31 @@
 
 All notable changes to HyFixes will be documented in this file.
 
+## [1.3.1] - 2026-01-17
+
+### Added
+
+#### New Bug Fixes
+- **CraftingManagerSanitizer** - Prevents player kick when opening processing benches with stale state
+  - Uses reflection-based API discovery to monitor CraftingManager component on players
+  - Clears stale bench references before `setBench()` can throw IllegalArgumentException
+  - Error: `Bench blockType is already set! Must be cleared (close UI)` at `CraftingManager.java:157`
+
+#### Documentation
+- **HYTALE_CORE_BUGS.md** - Comprehensive documentation of Hytale core bugs that cannot be fixed at plugin level
+  - InteractionChain Sync Buffer Overflow (with decompiled bytecode analysis)
+  - Missing Replacement Interactions
+  - Client/Server Interaction Desync
+  - World Task Queue Silent NPE
+  - Includes reproduction steps and suggested fixes for Hytale developers
+
+### Technical Details
+- Total active bug fixes increased from 10 to 11
+- New system uses EntityTickingSystem pattern on Player entities
+- CraftingManagerSanitizer uses runtime reflection for component discovery
+
+---
+
 ## [1.3.0] - 2026-01-16
 
 ### Added

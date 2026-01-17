@@ -3,6 +3,7 @@ package com.hyfixes;
 import com.hyfixes.commands.ChunkStatusCommand;
 import com.hyfixes.commands.ChunkUnloadCommand;
 import com.hyfixes.commands.InteractionStatusCommand;
+import com.hyfixes.listeners.CraftingManagerSanitizer;
 import com.hyfixes.listeners.EmptyArchetypeSanitizer;
 import com.hyfixes.listeners.GatherObjectiveTaskSanitizer;
 import com.hyfixes.listeners.InstancePositionTracker;
@@ -35,6 +36,7 @@ import java.util.logging.Level;
  * - ChunkUnloadManager: Aggressively unloads chunks to prevent memory bloat (v1.2.0)
  * - GatherObjectiveTaskSanitizer: Prevents crash from null refs in quest objectives (v1.3.0)
  * - InteractionChainMonitor: Tracks unfixable Hytale bugs for reporting (v1.3.0)
+ * - CraftingManagerSanitizer: Prevents crash from stale bench references (v1.3.1)
  */
 public class HyFixes extends JavaPlugin {
 
@@ -45,6 +47,7 @@ public class HyFixes extends JavaPlugin {
     private GatherObjectiveTaskSanitizer gatherObjectiveTaskSanitizer;
     private PickupItemChunkHandler pickupItemChunkHandler;
     private InteractionChainMonitor interactionChainMonitor;
+    private CraftingManagerSanitizer craftingManagerSanitizer;
 
     public HyFixes(@Nonnull JavaPluginInit init) {
         super(init);
@@ -122,6 +125,12 @@ public class HyFixes extends JavaPlugin {
         getEntityStoreRegistry().registerSystem(interactionChainMonitor);
         getLogger().at(Level.INFO).log("[MON] InteractionChainMonitor registered - tracks HyFixes statistics");
 
+        // Fix 10: CraftingManager bench already set crash (v1.3.1)
+        // Clears stale bench references before they cause IllegalArgumentException
+        craftingManagerSanitizer = new CraftingManagerSanitizer(this);
+        getEntityStoreRegistry().registerSystem(craftingManagerSanitizer);
+        getLogger().at(Level.INFO).log("[FIX] CraftingManagerSanitizer registered - prevents bench already set crash");
+
         // Register admin commands
         registerCommands();
     }
@@ -148,7 +157,7 @@ public class HyFixes extends JavaPlugin {
     }
 
     private int getFixCount() {
-        return 10; // PickupItemSanitizer, PickupItemChunkHandler, RespawnBlockSanitizer, ProcessingBenchSanitizer, EmptyArchetypeSanitizer, InstancePositionTracker, ChunkUnloadManager, ChunkCleanupSystem, GatherObjectiveTaskSanitizer, InteractionChainMonitor
+        return 11; // PickupItemSanitizer, PickupItemChunkHandler, RespawnBlockSanitizer, ProcessingBenchSanitizer, EmptyArchetypeSanitizer, InstancePositionTracker, ChunkUnloadManager, ChunkCleanupSystem, GatherObjectiveTaskSanitizer, InteractionChainMonitor, CraftingManagerSanitizer
     }
 
     public static HyFixes getInstance() {
@@ -188,5 +197,12 @@ public class HyFixes extends JavaPlugin {
      */
     public InteractionChainMonitor getInteractionChainMonitor() {
         return interactionChainMonitor;
+    }
+
+    /**
+     * Get the CraftingManagerSanitizer for commands and status.
+     */
+    public CraftingManagerSanitizer getCraftingManagerSanitizer() {
+        return craftingManagerSanitizer;
     }
 }

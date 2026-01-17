@@ -260,6 +260,38 @@ This affects combat damage, food SFX, and shield blocking. **This cannot be fixe
 
 ---
 
+### 10. CraftingManager Bench Already Set Crash (v1.3.1)
+
+**Severity:** Critical - Kicks the player who tried to open the bench
+
+**The Bug:**
+
+Hytale's `CraftingManager.setBench()` at line 157 throws:
+```java
+throw new IllegalArgumentException("Bench blockType is already set! Must be cleared (close UI).");
+```
+when a player tries to open a processing bench while the CraftingManager already has a bench reference set.
+
+This can happen when:
+- Player's previous bench interaction didn't properly clean up
+- Player rapidly opens multiple benches
+- Race condition during bench window opening
+
+```
+java.lang.IllegalArgumentException: Bench blockType is already set! Must be cleared (close UI).
+    at CraftingManager.setBench(CraftingManager.java:157)
+    at BenchWindow.onOpen0(BenchWindow.java:67)
+    at ProcessingBenchWindow.onOpen0(ProcessingBenchWindow.java:197)
+```
+
+**Impact:** The player who tried to open the bench is immediately kicked from the server.
+
+**The Fix:**
+
+`CraftingManagerSanitizer` is an `EntityTickingSystem` that monitors Player entities each tick. It uses reflection to discover and check the `CraftingManager` component. If a player has a stale bench reference (bench set but no window open), it clears the reference before it can cause a crash.
+
+---
+
 ## Technical Details
 
 | Fix | System Type | Registry | Hook Point |
@@ -274,6 +306,7 @@ This affects combat damage, food SFX, and shield blocking. **This cannot be fixe
 | ChunkCleanupSystem | `EntityTickingSystem<EntityStore>` | EntityStoreRegistry | Every 600 ticks (30s), calls cleanup on main thread |
 | GatherObjectiveTaskSanitizer | `EntityTickingSystem<EntityStore>` | EntityStoreRegistry | Every tick, validates objective refs (v1.3.0) |
 | InteractionChainMonitor | `EntityTickingSystem<EntityStore>` | EntityStoreRegistry | Tracks HyFixes statistics (v1.3.0) |
+| CraftingManagerSanitizer | `EntityTickingSystem<EntityStore>` | EntityStoreRegistry | Every tick, clears stale bench refs (v1.3.1) |
 
 ## Building
 
@@ -302,6 +335,25 @@ The workflow uses the official Hytale downloader to fetch `HytaleServer.jar` for
 ## License
 
 This project is provided as-is for the Hytale community. Use at your own risk.
+
+## Known Unfixable Bugs
+
+Some Hytale bugs **cannot be fixed at the plugin level** and require fixes from Hytale developers. These are documented in detail in **[HYTALE_CORE_BUGS.md](HYTALE_CORE_BUGS.md)**.
+
+| Bug | Severity | Frequency | Impact |
+|-----|----------|-----------|--------|
+| InteractionChain Sync Buffer Overflow | Critical | 400-2,500/session | Combat, food, tools desync |
+| Missing Replacement Interactions | Medium | 8-15/session | Missing SFX, broken handlers |
+| Client/Server Interaction Desync | Medium | 20-30/session | Action validation failures |
+| World Task Queue Silent NPE | Low | 10-15/session | Unknown (no stack trace) |
+
+The document includes:
+- Detailed technical analysis with decompiled bytecode
+- Reproduction steps
+- Suggested fixes for Hytale developers
+- Data collection scripts for server admins
+
+---
 
 ## Contributing
 
