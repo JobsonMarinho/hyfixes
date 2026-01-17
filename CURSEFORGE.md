@@ -1,93 +1,155 @@
 # HyFixes
 
-Essential bug fixes for Hytale Early Access servers. Prevents crashes and player kicks caused by known issues.
+Essential bug fixes for Hytale Early Access servers. Prevents crashes and player kicks caused by known issues in Hytale's core systems.
 
-## What This Fixes
+## Support
 
-### Pickup Item Crash (Critical)
-When a player disconnects while picking up an item, the world thread crashes and **kicks ALL players** in that world.
-- **Error:** `NullPointerException` in `PickupItemSystem.tick()` - null `targetRef`
-- **Fix:** Safely marks corrupted pickup items as finished before they crash the server
+**Need help?** Join our Discord for community support!
 
-### RespawnBlock Crash (Critical)
-When a player breaks a bed or sleeping bag, they get **kicked from the server**.
-- **Error:** `NullPointerException` in `RespawnBlock$OnRemove` - null `respawnPoints` array
-- **Fix:** Initializes the respawn points array before Hytale's buggy code runs
+**Discord:** https://discord.gg/u5R7kuuGXU
 
-### ProcessingBench Window Crash (Critical)
-When a player breaks a campfire or crafting table while another player has it open, they get **kicked from the server**.
-- **Error:** `NullPointerException` in `BenchWindow.onClose0` - null `ref` during window close
-- **Fix:** Clears the windows map before the crash-causing close handlers run
+**Found a bug?** Report it on GitHub:
 
-### Instance Exit Missing Return World (Critical)
-When a player exits an instance (dungeon, cave, etc.) and the return world data is corrupted, they get **kicked from the server**.
-- **Error:** `IllegalArgumentException` in `InstancesPlugin.exitInstance` - Missing return world
-- **Fix:** Tracks player position before entering instances and uses it as fallback destination
+**GitHub Issues:** https://github.com/John-Willikers/hyfixes/issues
 
-### Empty Archetype Entities (Monitoring)
-Logs entities with corrupted/empty component data for debugging. These don't crash but indicate world data issues.
-
-### Chunk Memory Bloat (High - v1.2.0+)
-Hytale doesn't properly unload chunks when players move away, causing **unbounded memory growth** and eventual OOM crashes.
-- **Symptoms:** Server memory grows from 4GB to 14GB+ while players fly around; chunks never decrease
-- **Example:** Player loads 5,735 chunks, only 317 are in view radius, 5,400+ stay in memory forever
-- **Fix:** `ChunkCleanupSystem` runs on the main thread every 30 seconds to trigger Hytale's internal chunk cleanup
-- **Results:** Observed 77% reduction in loaded chunks (942 → 211) after fix
-- **Commands:** `/chunkstatus` (view chunk counts), `/chunkunload` (force cleanup)
-
-### GatherObjectiveTask Crash (Critical - v1.3.0)
-When a player has a quest/objective and the target entity despawns, the quest system **crashes**.
-- **Error:** `NullPointerException` in `GatherObjectiveTask.lambda$setup0$1` - null `ref`
-- **Fix:** Monitors objectives each tick via reflection and clears corrupted objectives before crash
-
-### Pickup Item Chunk Protection (Critical - v1.3.0)
-Backup protection for pickup item crashes during chunk unload events.
-- **Scenario:** Player teleports away rapidly while item is being picked up
-- **Fix:** RefSystem intercepts entity removal events and validates targetRef before crash cascade
-
-### HyFixes Status Command (v1.3.0)
-New admin command to view comprehensive HyFixes statistics.
-- **Command:** `/interactionstatus` (aliases: `/hyfixes`, `/hfs`)
-- **Shows:** Crashes prevented by type, memory stats, known unfixable Hytale bugs
-
-### CraftingManager Bench Crash (Critical - v1.3.1)
-When a player opens a processing bench while having a stale bench reference, they get **kicked from the server**.
-- **Error:** `IllegalArgumentException` in `CraftingManager.setBench` - Bench blockType is already set
-- **Fix:** Monitors players each tick and clears stale bench references before crash
-
-### InteractionManager NPE Crash (Critical - v1.3.1)
-When a player opens a crafttable at specific locations, they get **kicked from the server**.
-- **Error:** `NullPointerException` in `InteractionSystems$TickInteractionManagerSystem`
-- **Fix:** Validates interaction chains each tick and removes corrupted ones before crash
-- **GitHub Issue:** [#1](https://github.com/John-Willikers/hyfixes/issues/1)
-
-### Client Timeout Protection (Critical - v1.3.3)
-When an interaction chain waits too long for client data, the player gets **kicked from the server**.
-- **Error:** `RuntimeException: Client took too long to send clientData` at `InteractionChain.java:207`
-- **Fix:** Proactively detects chains waiting too long (>2.5 seconds) and removes them before Hytale kicks the player
+---
 
 ## Installation
 
-1. Download `hyfixes-x.x.x.jar`
-2. Place in your server's `mods/` folder
+HyFixes consists of two plugins that work together:
+
+### Runtime Plugin (Required)
+
+The main plugin that fixes most crashes.
+
+1. Download `hyfixes.jar`
+2. Place in your server's `plugins/` folder
 3. Restart the server
+
+### Early Plugin (Recommended)
+
+Fixes deep networking bugs that cause combat/interaction desync.
+
+1. Download `hyfixes-early.jar`
+2. Place in your server's `earlyplugins/` folder
+3. Start the server with one of these options:
+   - Set environment variable: `ACCEPT_EARLY_PLUGINS=1`
+   - OR press Enter when you see the early plugins warning at startup
+
+---
+
+## What Gets Fixed
+
+### Runtime Plugin
+
+- **Pickup Item Crash** - World thread crash when player disconnects while picking up item
+- **RespawnBlock Crash** - Player kicked when breaking bed/sleeping bag
+- **ProcessingBench Crash** - Player kicked when bench is destroyed while open
+- **Instance Exit Crash** - Player kicked when exiting dungeon with corrupted data
+- **Chunk Memory Bloat** - Server runs out of memory from unloaded chunks
+- **CraftingManager Crash** - Player kicked when opening crafting bench
+- **InteractionManager Crash** - Player kicked during certain interactions
+- **Quest Objective Crash** - Quest system crashes when target despawns
+- **SpawnMarker Crash** - World crash during entity spawning
+
+### Early Plugin (Bytecode Fixes)
+
+- **Sync Buffer Overflow** - Fixes combat/food/tool desync (400-2500 errors per session)
+- **Sync Position Gap** - Fixes "out of order" exception that kicks players
+
+---
+
+## Verifying Installation
+
+### Runtime Plugin
+
+Look for these messages in your server log at startup:
+
+```
+[HyFixes|P] Plugin enabled - HyFixes vX.X.X
+[HyFixes|P] [PickupItemSanitizer] Active - monitoring for corrupted pickup items
+[HyFixes|P] [ChunkCleanupSystem] Active on MAIN THREAD
+```
+
+### Early Plugin
+
+Look for these messages in your server log at startup:
+
+```
+[HyFixes-Early] Transforming InteractionChain class...
+[HyFixes-Early] Found method: putInteractionSyncData - Applying buffer overflow fix...
+[HyFixes-Early] Found method: updateSyncPosition - Applying sync position fix...
+[HyFixes-Early] InteractionChain transformation COMPLETE!
+```
+
+---
+
+## Admin Commands
+
+| Command | Description |
+|---------|-------------|
+| `/hyfixes` | Show HyFixes statistics and crash prevention counts |
+| `/chunkstatus` | Show loaded chunk counts and memory info |
+| `/chunkunload` | Force immediate chunk cleanup |
+
+Aliases: `/hfs`, `/interactionstatus`
+
+---
+
+## Troubleshooting
+
+### Plugin not loading
+
+1. Check that the JAR is in the correct folder:
+   - Runtime plugin: `plugins/hyfixes.jar`
+   - Early plugin: `earlyplugins/hyfixes-early.jar`
+
+2. Check server logs for errors during startup
+
+3. Verify Java 21+ is installed: `java -version`
+
+### Early plugin warning at startup
+
+This is normal! Hytale shows a security warning for early plugins because they can modify game code. HyFixes only modifies the specific buggy methods to fix them.
+
+To bypass the warning:
+- Set `ACCEPT_EARLY_PLUGINS=1` environment variable
+- OR press Enter when prompted
+
+### Still seeing crashes
+
+1. Check which version of HyFixes you have: `/hyfixes`
+2. Update to the latest version
+3. Report the crash on GitHub with:
+   - Full server log showing the error
+   - Steps to reproduce (if known)
+   - HyFixes version
+
+---
 
 ## Compatibility
 
-- Hytale Early Access (2025+)
-- Java 21+
-- Server-side only
+- **Hytale:** Early Access (2025+)
+- **Java:** 21 or higher
+- **Side:** Server-side only (no client install needed)
 
-## Known Unfixable Bugs
+---
 
-Some Hytale core bugs **cannot be fixed at the plugin level**. We've documented these in detail to help Hytale developers:
+## More Information
 
-- **InteractionChain Sync Buffer Overflow** - Causes combat/food/tool desync (400-2,500 errors/session)
-- **Missing Replacement Interactions** - Missing sound effects and handlers
-- **Client/Server Interaction Desync** - Action validation failures
+For detailed technical documentation, source code, and contribution guidelines:
 
-See [HYTALE_CORE_BUGS.md](https://github.com/John-Willikers/hyfixes/blob/main/HYTALE_CORE_BUGS.md) for full technical analysis.
+**GitHub Repository:** https://github.com/John-Willikers/hyfixes
 
-## Source Code
+**Full Bug Documentation:** https://github.com/John-Willikers/hyfixes/blob/main/BUGS_FIXED.md
 
-[GitHub Repository](https://github.com/John-Willikers/hyfixes)
+---
+
+## Support the Project
+
+- Star the repo on GitHub
+- Report bugs you encounter
+- Join our Discord community
+- Share HyFixes with other server admins!
+
+**Discord:** https://discord.gg/u5R7kuuGXU

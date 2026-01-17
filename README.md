@@ -1,359 +1,213 @@
 # HyFixes
 
-Bug fixes for Hytale Early Access servers. This plugin patches known crashes and issues that can kick players or crash world threads.
+Essential bug fixes for Hytale Early Access servers. Prevents crashes, player kicks, and desync issues caused by known bugs in Hytale's core systems.
 
-## Installation
+[![Discord](https://img.shields.io/badge/Discord-Join%20for%20Support-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/u5R7kuuGXU)
+[![GitHub Issues](https://img.shields.io/badge/GitHub-Report%20Bugs-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/John-Willikers/hyfixes/issues)
 
-1. Download the latest `hyfixes-x.x.x.jar` from [Releases](https://github.com/John-Willikers/hyfixes/releases)
-2. Place in your server's `mods/` directory
+---
+
+## Two Plugins, One Solution
+
+HyFixes consists of **two complementary plugins** that work together to fix different types of bugs:
+
+| Plugin | File | Purpose |
+|--------|------|---------|
+| **Runtime Plugin** | `hyfixes.jar` | Fixes bugs at runtime using sanitizers and event hooks |
+| **Early Plugin** | `hyfixes-early.jar` | Fixes deep core bugs via bytecode transformation at class load |
+
+### Why Two Plugins?
+
+Some Hytale bugs occur in code paths that cannot be intercepted at runtime. The **Early Plugin** uses Java bytecode transformation (ASM) to rewrite buggy methods *before* they're loaded, allowing us to fix issues deep in Hytale's networking and interaction systems.
+
+---
+
+## Quick Start
+
+### Runtime Plugin (Required)
+
+1. Download `hyfixes.jar` from [Releases](https://github.com/John-Willikers/hyfixes/releases)
+2. Place in your server's `plugins/` directory
 3. Restart the server
 
-## Bug Fixes
+### Early Plugin (Recommended)
 
-### 1. Pickup Item Null TargetRef Crash
+1. Download `hyfixes-early.jar` from [Releases](https://github.com/John-Willikers/hyfixes/releases)
+2. Place in your server's `earlyplugins/` directory
+3. Start the server with early plugins enabled:
+   - Set `ACCEPT_EARLY_PLUGINS=1` environment variable, OR
+   - Press Enter when prompted at startup
 
-**Severity:** Critical - Crashes entire world thread, disconnects ALL players
+---
 
-**The Bug:**
+## What Gets Fixed
 
-Hytale's `PickupItemSystem.tick()` at line 69 calls:
+### Runtime Plugin Fixes
+
+| Bug | Severity | What Happens |
+|-----|----------|--------------|
+| Pickup Item Crash | Critical | World thread crashes, ALL players kicked |
+| RespawnBlock Crash | Critical | Player kicked when breaking bed |
+| ProcessingBench Crash | Critical | Player kicked when bench is destroyed |
+| Instance Exit Crash | Critical | Player kicked when exiting dungeon |
+| Chunk Memory Bloat | High | Server runs out of memory over time |
+| CraftingManager Crash | Critical | Player kicked when opening bench |
+| InteractionManager Crash | Critical | Player kicked during interactions |
+| Quest Objective Crash | Critical | Quest system crashes |
+| SpawnMarker Crash | Critical | World thread crashes during spawning |
+
+### Early Plugin Fixes (Bytecode)
+
+| Bug | Severity | What Happens |
+|-----|----------|--------------|
+| Sync Buffer Overflow | Critical | Combat/food/tool desync, 400-2500 errors/session |
+| Sync Position Gap | Critical | Player kicked with "out of order" exception |
+
+---
+
+## How It Works
+
+### Runtime Plugin
+
+The runtime plugin registers **sanitizers** that run each server tick:
+
+```
+Server Tick
+    |
+    v
+[PickupItemSanitizer] --> Check for null targetRef --> Mark as finished
+[CraftingManagerSanitizer] --> Check for stale bench refs --> Clear them
+[InteractionManagerSanitizer] --> Check for null contexts --> Remove chain
+    |
+    v
+Hytale's Systems Run (safely, with corrupted data already cleaned up)
+```
+
+It also uses **RefSystems** that hook into entity lifecycle events to catch crashes during removal/unload operations.
+
+### Early Plugin
+
+The early plugin uses ASM bytecode transformation to rewrite methods at class load time:
+
+```
+Server Startup
+    |
+    v
+JVM loads InteractionChain.class
+    |
+    v
+[InteractionChainTransformer] intercepts class bytes
+    |
+    v
+[PutSyncDataMethodVisitor] rewrites putInteractionSyncData()
+[UpdateSyncPositionMethodVisitor] rewrites updateSyncPosition()
+    |
+    v
+Fixed class is loaded into JVM
+```
+
+**Original buggy code:**
 ```java
-getTargetRef().isValid()
-```
-without null-checking `getTargetRef()` first.
-
-When a player disconnects or an entity despawns while an item is being picked up, `targetRef` becomes null. This causes:
-
-```
-java.lang.NullPointerException: Cannot invoke
-    "com.hypixel.hytale.component.Ref.isValid()" because "targetRef" is null
-    at PickupItemSystem.tick(PickupItemSystem.java:69)
+if (adjustedIndex < 0) {
+    LOGGER.severe("Attempted to store sync data...");
+    return;  // DATA DROPPED!
+}
 ```
 
-**Impact:** The world thread crashes, immediately disconnecting every player in that world.
-
-**The Fix:**
-
-`PickupItemSanitizer` runs each server tick and checks all `PickupItemComponent` entities. If it finds one with a null `targetRef`, it marks the component as "finished" before `PickupItemSystem` can crash on it. The item is then safely cleaned up by the normal pickup system.
-
----
-
-### 2. RespawnBlock Null RespawnPoints Crash
-
-**Severity:** Critical - Kicks the player who breaks the block
-
-**The Bug:**
-
-Hytale's `RespawnBlock$OnRemove.onEntityRemove()` at line 106 iterates:
+**Transformed fixed code:**
 ```java
-for (int i = 0; i < respawnPoints.length; i++)
+if (adjustedIndex < 0) {
+    // Expand buffer backwards instead of dropping
+    int expansion = -adjustedIndex;
+    for (int i = 0; i < expansion; i++) {
+        tempSyncData.add(0, null);
+    }
+    tempSyncDataOffset += adjustedIndex;
+    adjustedIndex = 0;
+}
+// Continue processing...
 ```
-without null-checking `respawnPoints` first.
-
-When a player breaks a respawn block (bed, sleeping bag, etc.) and their `PlayerWorldData.getRespawnPoints()` returns null, the server crashes:
-
-```
-java.lang.NullPointerException: Cannot read the array length because "respawnPoints" is null
-    at RespawnBlock$OnRemove.onEntityRemove(RespawnBlock.java:106)
-```
-
-**Impact:** The player who broke the block is immediately kicked from the server.
-
-**The Fix:**
-
-`RespawnBlockSanitizer` is a `RefSystem` that hooks into the `RespawnBlock` component lifecycle. When a respawn block is about to be removed (not unloaded), it:
-
-1. Gets the owner's UUID from the `RespawnBlock` component
-2. Looks up the player's `PlayerWorldData`
-3. If `getRespawnPoints()` is null, initializes it to an empty array
-
-This runs before Hytale's `RespawnBlock$OnRemove` system, preventing the crash.
 
 ---
 
-### 3. ProcessingBench Window NPE Crash
+## Admin Commands
 
-**Severity:** Critical - Kicks the player who had the window open
-
-**The Bug:**
-
-Hytale's `ProcessingBenchState.onDestroy()` at line 709 calls:
-```java
-WindowManager.closeAndRemoveAll()
-```
-which triggers window close handlers that try to access block data that's already being destroyed.
-
-When a player breaks a processing bench (campfire, crafting table, etc.) while another player has it open, the window close callbacks fail with:
-
-```
-java.lang.NullPointerException: Cannot invoke "...Ref.getStore()" because "ref" is null
-    at BenchWindow.onClose0(BenchWindow.java:83)
-    at ProcessingBenchWindow.onClose0(ProcessingBenchWindow.java:246)
-```
-
-**Impact:** The player who had the bench window open is immediately kicked from the server.
-
-**The Fix:**
-
-`ProcessingBenchSanitizer` is a `RefSystem` that hooks into the `ProcessingBenchState` component lifecycle. When a processing bench is about to be removed (not unloaded), it:
-
-1. Gets the windows map from the `ProcessingBenchState` component
-2. Clears the windows map before `onDestroy()` runs
-3. The `closeAndRemoveAll()` call finds an empty map and safely does nothing
-
-This prevents the crash cascade from ever starting.
+| Command | Aliases | Description |
+|---------|---------|-------------|
+| `/hyfixes` | `/hfs`, `/interactionstatus` | Show HyFixes statistics and status |
+| `/chunkstatus` | | Show chunk counts and memory info |
+| `/chunkunload` | | Force immediate chunk cleanup |
 
 ---
 
-### 4. ExitInstance Missing Return World Crash
+## Verification
 
-**Severity:** Critical - Kicks the player who tried to exit the instance
+### Runtime Plugin Loaded
 
-**The Bug:**
-
-Hytale's `InstancesPlugin.exitInstance()` at line 493 throws:
-```java
-throw new IllegalArgumentException("Missing return world");
+Look for these log messages at startup:
 ```
-when the return world reference is null or invalid.
-
-When a player exits an instance (dungeon, cave, etc.) and the return world data is corrupted or missing:
-
-```
-java.lang.IllegalArgumentException: Missing return world
-    at InstancesPlugin.exitInstance(InstancesPlugin.java:493)
-    at ExitInstanceInteraction.firstRun(ExitInstanceInteraction.java:44)
+[HyFixes|P] Plugin enabled - HyFixes vX.X.X
+[HyFixes|P] [PickupItemSanitizer] Active - monitoring for corrupted pickup items
+[HyFixes|P] [ChunkCleanupSystem] Active on MAIN THREAD
 ```
 
-**Impact:** The player who tried to exit the instance is immediately kicked from the server.
+### Early Plugin Loaded
 
-**The Fix:**
-
-`InstancePositionTracker` is an event listener that hooks into world transfer events. It:
-
-1. Saves the player's position when they leave a normal world to enter an instance
-2. When the player exits the instance, it sets the destination to the saved position
-3. If the return world was corrupted, the player still gets teleported back to where they were
-
-This ensures players always have a valid destination when exiting instances.
+Look for these log messages at startup:
+```
+[HyFixes-Early] Transforming InteractionChain class...
+[HyFixes-Early] Found method: putInteractionSyncData - Applying buffer overflow fix...
+[HyFixes-Early] Found method: updateSyncPosition - Applying sync position fix...
+[HyFixes-Early] InteractionChain transformation COMPLETE!
+```
 
 ---
 
-### 5. Empty Archetype Entity Monitoring
+## Documentation
 
-**Severity:** Low - Informational logging only (no crash)
-
-**The Bug:**
-
-Hytale's `EntityChunkLoadingSystem` logs SEVERE errors when it encounters entities with empty archetypes:
-```
-[EntityChunk$EntityChunkLoadingSystem] Empty archetype entity holder:
-EntityHolder{archetype=Archetype{componentTypes=[]}, components=[]}
-```
-
-These occur due to:
-- Codec deserialization failures during save/load
-- Data corruption in chunk storage
-- World generation issues creating invalid entities
-
-**Impact:** No crash - Hytale already excludes these entities from the world. The SEVERE log is intentional to flag data corruption.
-
-**The Fix:**
-
-`EmptyArchetypeSanitizer` monitors entities during tick and checks for invalid states like NaN/Infinite positions.
-
-**Note:** We cannot intercept empty archetype entities before they're logged because they have no components to query. Hytale's own system already handles them by excluding them from the world. The logs indicate where chunk data may be corrupted.
+| Document | Description |
+|----------|-------------|
+| [BUGS_FIXED.md](BUGS_FIXED.md) | Detailed technical info on every bug we fix |
+| [HYTALE_CORE_BUGS.md](HYTALE_CORE_BUGS.md) | Bugs that require Hytale developers to fix |
+| [CHANGELOG.md](CHANGELOG.md) | Version history and release notes |
 
 ---
 
-### 6. Chunk Memory Bloat (v1.2.0+)
+## Support
 
-**Severity:** High - Causes unbounded memory growth and eventual OOM crashes
+**Found a bug?** Please report it on [GitHub Issues](https://github.com/John-Willikers/hyfixes/issues) with:
+- Server logs showing the error
+- Steps to reproduce (if known)
+- HyFixes version
 
-**The Bug:**
-
-Hytale does not properly unload chunks when players move away from them. Chunks accumulate in memory indefinitely:
-
-- Player flies in a straight line, loads 5,735+ chunks
-- Only ~300 chunks are within view radius ("active")
-- The remaining 5,400+ "orphan" chunks stay cached in memory
-- Memory grows unbounded: 4GB → 14GB+ while idle
-
-**Impact:** Server eventually runs out of memory and crashes, or GC pauses become severe.
-
-**The Fix:**
-
-`ChunkUnloadManager` uses reflection to discover Hytale's internal chunk management APIs:
-- `ChunkStore.waitForLoadingChunks()` - Syncs chunk loading state
-- `ChunkLightingManager.invalidateLoadedChunks()` - Triggers chunk cleanup
-
-`ChunkCleanupSystem` is an `EntityTickingSystem` that runs these methods on the **main server thread** every 30 seconds, avoiding the `InvocationTargetException` that occurs when calling them from background threads.
-
-**Results:** Chunks now properly cycle - observed 942 → 211 chunks (77% reduction) after players move away.
-
-**Admin Commands:**
-- `/chunkstatus` - Shows current chunk counts and cleanup system status
-- `/chunkunload` - Forces immediate chunk cleanup
+**Need help?** Join our [Discord](https://discord.gg/u5R7kuuGXU) for community support!
 
 ---
 
-### 7. GatherObjectiveTask Null Ref Crash (v1.3.0)
+## Building from Source
 
-**Severity:** Critical - Crashes quest/objective processing
-
-**The Bug:**
-
-Hytale's `GatherObjectiveTask.lambda$setup0$1()` at line 65 calls:
-```java
-store.getComponent(ref, ...)
-```
-where `ref` can be null if the target entity was destroyed.
-
-```
-java.lang.NullPointerException: Cannot invoke "com.hypixel.hytale.component.Ref.validate()"
-because "ref" is null
-    at com.hypixel.hytale.component.Store.__internal_getComponent(Store.java:1222)
-    at GatherObjectiveTask.lambda$setup0$1(GatherObjectiveTask.java:65)
-```
-
-**Impact:** Quest/objective tasks fail when their target entity is destroyed.
-
-**The Fix:**
-
-`GatherObjectiveTaskSanitizer` monitors player objectives each tick using reflection to discover and validate objective component refs. If a ref is null or invalid, it attempts to clear/cancel the objective before the crash occurs.
-
----
-
-### 8. Pickup Item Chunk Unload Protection (v1.3.0)
-
-**Severity:** Critical - Backup protection for edge cases
-
-**The Bug:**
-
-In rare cases, a player teleporting away can cause pickup items to crash if the `PickupItemSanitizer` tick doesn't run before the chunk unload cascade.
-
-**The Fix:**
-
-`PickupItemChunkHandler` is a `RefSystem` that acts as a backup to the primary `PickupItemSanitizer`. It intercepts entity removal events (including chunk unloads) and validates targetRef before the removal cascade can trigger a crash.
-
----
-
-### 9. Interaction Chain Monitoring (v1.3.0)
-
-**Severity:** Monitoring - Cannot fix, only track
-
-**The Bug:**
-
-Hytale's InteractionChain system has a buffer overflow issue that causes 400+ errors per session:
-```
-[SEVERE] [InteractionChain] Attempted to store sync data at 1. Offset: 3, Size: 0
-```
-
-This affects combat damage, food SFX, and shield blocking. **This cannot be fixed at the plugin level** as it's deep in Hytale's core networking code.
-
-**The Fix:**
-
-`InteractionChainMonitor` tracks HyFixes statistics and known unfixable issues for reporting to Hytale developers.
-
-**Admin Commands:**
-- `/interactionstatus` (alias: `/hyfixes`, `/hfs`) - Shows comprehensive HyFixes statistics and known issues
-
----
-
-### 10. CraftingManager Bench Already Set Crash (v1.3.1)
-
-**Severity:** Critical - Kicks the player who tried to open the bench
-
-**The Bug:**
-
-Hytale's `CraftingManager.setBench()` at line 157 throws:
-```java
-throw new IllegalArgumentException("Bench blockType is already set! Must be cleared (close UI).");
-```
-when a player tries to open a processing bench while the CraftingManager already has a bench reference set.
-
-This can happen when:
-- Player's previous bench interaction didn't properly clean up
-- Player rapidly opens multiple benches
-- Race condition during bench window opening
-
-```
-java.lang.IllegalArgumentException: Bench blockType is already set! Must be cleared (close UI).
-    at CraftingManager.setBench(CraftingManager.java:157)
-    at BenchWindow.onOpen0(BenchWindow.java:67)
-    at ProcessingBenchWindow.onOpen0(ProcessingBenchWindow.java:197)
-```
-
-**Impact:** The player who tried to open the bench is immediately kicked from the server.
-
-**The Fix:**
-
-`CraftingManagerSanitizer` is an `EntityTickingSystem` that monitors Player entities each tick. It uses reflection to discover and check the `CraftingManager` component. If a player has a stale bench reference (bench set but no window open), it clears the reference before it can cause a crash.
-
----
-
-### 11. InteractionManager NPE Crash (v1.3.1)
-
-**Severity:** Critical - Kicks the player who tried to interact
-
-**GitHub Issue:** https://github.com/John-Willikers/hyfixes/issues/1
-
-**The Bug:**
-
-When a player opens a crafttable at specific locations, the `InteractionManager` can end up with chains containing null context data. When `TickInteractionManagerSystem` tries to tick these chains, it throws a NullPointerException and **kicks the player**.
-
-```
-[SEVERE] [InteractionSystems$TickInteractionManagerSystem] Exception while ticking entity interactions! Removing!
-java.lang.NullPointerException
-```
-
-**Impact:** The player who tried to open the crafttable is immediately kicked from the server with "Player removed from world!"
-
-**The Fix:**
-
-`InteractionManagerSanitizer` is an `EntityTickingSystem` that validates all interaction chains each tick. It uses reflection to:
-
-1. Access the `InteractionManager` component on each player
-2. Iterate through all active chains
-3. Check if context is null or owningEntity ref is invalid
-4. Remove corrupted chains before they can cause a crash
-
-This runs before `TickInteractionManagerSystem` can process the invalid chains.
-
----
-
-## Technical Details
-
-| Fix | System Type | Registry | Hook Point |
-|-----|-------------|----------|------------|
-| PickupItemSanitizer | `EntityTickingSystem<EntityStore>` | EntityStoreRegistry | Every tick, queries `PickupItemComponent` |
-| PickupItemChunkHandler | `RefSystem<EntityStore>` | EntityStoreRegistry | `onEntityRemove()` for `PickupItemComponent` (v1.3.0) |
-| RespawnBlockSanitizer | `RefSystem<ChunkStore>` | ChunkStoreRegistry | `onEntityRemove()` for `RespawnBlock` component |
-| ProcessingBenchSanitizer | `RefSystem<ChunkStore>` | ChunkStoreRegistry | `onEntityRemove()` for `ProcessingBenchState` component |
-| InstancePositionTracker | `Listener` (EventHandler) | EventBus | `DrainPlayerFromWorldEvent`, `AddPlayerToWorldEvent` |
-| EmptyArchetypeSanitizer | `EntityTickingSystem<EntityStore>` | EntityStoreRegistry | Every tick, queries `TransformComponent` |
-| ChunkUnloadManager | `ScheduledExecutorService` | N/A (background thread) | Reflection-based API discovery, 30s interval |
-| ChunkCleanupSystem | `EntityTickingSystem<EntityStore>` | EntityStoreRegistry | Every 600 ticks (30s), calls cleanup on main thread |
-| GatherObjectiveTaskSanitizer | `EntityTickingSystem<EntityStore>` | EntityStoreRegistry | Every tick, validates objective refs (v1.3.0) |
-| InteractionChainMonitor | `EntityTickingSystem<EntityStore>` | EntityStoreRegistry | Tracks HyFixes statistics (v1.3.0) |
-| CraftingManagerSanitizer | `EntityTickingSystem<EntityStore>` | EntityStoreRegistry | Every tick, clears stale bench refs (v1.3.1) |
-| InteractionManagerSanitizer | `EntityTickingSystem<EntityStore>` | EntityStoreRegistry | Every tick, validates interaction chains (v1.3.1) |
-
-## Building
-
-Requires Java 21 and access to `HytaleServer.jar` (not included).
+Requires Java 21 and access to `HytaleServer.jar`.
 
 ```bash
+# Clone the repo
+git clone https://github.com/John-Willikers/hyfixes.git
+cd hyfixes
+
 # Place HytaleServer.jar in libs/ directory
 mkdir -p libs
 cp /path/to/HytaleServer.jar libs/
 
-# Build
+# Build runtime plugin
 ./gradlew build
+# Output: build/libs/hyfixes.jar
 
-# JAR output
-ls build/libs/hyfixes-*.jar
+# Build early plugin
+cd hyfixes-early
+./gradlew build
+# Output: build/libs/hyfixes-early-1.0.0.jar
 ```
+
+---
 
 ## CI/CD
 
@@ -361,31 +215,20 @@ This repository uses GitHub Actions to automatically:
 - Build on every push to `main`
 - Create releases when you push a version tag (`v1.0.0`, `v1.0.1`, etc.)
 
-The workflow uses the official Hytale downloader to fetch `HytaleServer.jar` for compilation.
+---
 
 ## License
 
 This project is provided as-is for the Hytale community. Use at your own risk.
 
-## Known Unfixable Bugs
-
-Some Hytale bugs **cannot be fixed at the plugin level** and require fixes from Hytale developers. These are documented in detail in **[HYTALE_CORE_BUGS.md](HYTALE_CORE_BUGS.md)**.
-
-| Bug | Severity | Frequency | Impact |
-|-----|----------|-----------|--------|
-| InteractionChain Sync Buffer Overflow | Critical | 400-2,500/session | Combat, food, tools desync |
-| Missing Replacement Interactions | Medium | 8-15/session | Missing SFX, broken handlers |
-| Client/Server Interaction Desync | Medium | 20-30/session | Action validation failures |
-| World Task Queue Silent NPE | Low | 10-15/session | Unknown (no stack trace) |
-
-The document includes:
-- Detailed technical analysis with decompiled bytecode
-- Reproduction steps
-- Suggested fixes for Hytale developers
-- Data collection scripts for server admins
-
 ---
 
 ## Contributing
 
-Found another Hytale bug that needs patching? Open an issue or PR!
+Found another Hytale bug that needs patching? We'd love your help!
+
+1. Open an [issue](https://github.com/John-Willikers/hyfixes/issues) describing the bug
+2. Fork the repo and create a fix
+3. Submit a PR with your changes
+
+Join our [Discord](https://discord.gg/u5R7kuuGXU) to discuss ideas!
