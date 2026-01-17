@@ -10,9 +10,11 @@ build/
 # Build outputs
 *.jar
 !gradle-wrapper.jar
+!libs/HytaleServer.jar
 
-# Dependencies (downloaded in CI)
+# Dependencies (but keep HytaleServer.jar)
 libs/
+!libs/HytaleServer.jar
 
 # OS
 .DS_Store
