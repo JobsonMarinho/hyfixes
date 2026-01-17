@@ -2,6 +2,50 @@
 
 All notable changes to HyFixes will be documented in this file.
 
+## [1.4.0] - 2026-01-17
+
+### Added
+
+#### HyFixes Early Plugin (Bytecode Transformation)
+- **New `hyfixes-early.jar`** - A bootstrap/early plugin that uses ASM bytecode transformation to fix bugs deep in Hytale's core that cannot be patched at runtime
+- Place in `earlyplugins/` folder and set `ACCEPT_EARLY_PLUGINS=1` or press Enter at startup
+
+#### InteractionChain Sync Buffer Overflow Fix
+- **Target:** `InteractionChain.putInteractionSyncData()`
+- **Bug:** Data silently dropped when sync data arrives out of order, causing 400-2500+ errors per session
+- **Symptoms:** Combat damage not registering, food SFX missing, shield blocking failing, tool interactions broken
+- **Fix:** Completely replaces method to expand buffer backwards instead of dropping data
+- Previously documented as "unfixable at plugin level" in HYTALE_CORE_BUGS.md - now fixed via bytecode transformation!
+
+#### InteractionChain Sync Position Gap Fix
+- **Target:** `InteractionChain.updateSyncPosition()`
+- **Bug:** Throws `IllegalArgumentException: Temp sync data sent out of order` and kicks player
+- **Fix:** Replaces method to handle gaps gracefully instead of throwing exceptions
+
+### Changed
+
+#### Documentation Reorganization
+- **New `BUGS_FIXED.md`** - Detailed technical documentation for all 14 bugs we fix
+- **Updated `README.md`** - Clean overview explaining both plugins and how they work
+- **Updated `CURSEFORGE.md`** - Focused on installation, troubleshooting, and support
+- Added Discord support link: https://discord.gg/u5R7kuuGXU
+- Added GitHub Issues link for bug reports
+
+#### CI/CD Improvements
+- Workflow now builds both runtime and early plugins
+- Creates bundle ZIP with both plugins + installation instructions
+- Releases include three downloads: `hyfixes.jar`, `hyfixes-early.jar`, `hyfixes-bundle-vX.X.X.zip`
+- Discord webhook notification on new releases
+
+### Technical Details
+
+The early plugin uses ASM 9.6 to transform `InteractionChain.class` at load time:
+- `PutSyncDataMethodVisitor` - Replaces `putInteractionSyncData()` with buffer expansion logic
+- `UpdateSyncPositionMethodVisitor` - Replaces `updateSyncPosition()` with gap-tolerant logic
+- Transformation logged at startup for verification
+
+---
+
 ## [1.3.10] - 2026-01-17
 
 ### Added
