@@ -129,6 +129,7 @@ jobs:
         run: ls -la ./release/
 
       - name: Create Release
+        id: create_release
         uses: softprops/action-gh-release@v2
         with:
           files: |
@@ -163,3 +164,46 @@ jobs:
             - **Discord:** https://discord.gg/u5R7kuuGXU
             - **Issues:** https://github.com/John-Willikers/hyfixes/issues
           generate_release_notes: true
+
+      - name: Send Discord Notification
+        if: success()
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          curl -H "Content-Type: application/json" \
+            -X POST \
+            -d '{
+              "embeds": [{
+                "title": "🎉 HyFixes ${{ steps.version.outputs.VERSION }} Released!",
+                "description": "A new version of HyFixes is now available for download.",
+                "color": 5814783,
+                "fields": [
+                  {
+                    "name": "📦 Downloads",
+                    "value": "[**hyfixes.jar**](https://github.com/John-Willikers/hyfixes/releases/download/${{ steps.version.outputs.VERSION }}/hyfixes.jar) - Runtime Plugin\n[**hyfixes-early.jar**](https://github.com/John-Willikers/hyfixes/releases/download/${{ steps.version.outputs.VERSION }}/hyfixes-early.jar) - Early Plugin\n[**Bundle ZIP**](https://github.com/John-Willikers/hyfixes/releases/download/${{ steps.version.outputs.VERSION }}/hyfixes-bundle-${{ steps.version.outputs.VERSION }}.zip) - Both + Instructions",
+                    "inline": false
+                  },
+                  {
+                    "name": "🛡️ Runtime Plugin Fixes",
+                    "value": "• Pickup item crashes\n• Respawn block crashes\n• Processing bench crashes\n• Instance exit crashes\n• Chunk memory bloat\n• Crafting manager crashes\n• Interaction manager crashes",
+                    "inline": true
+                  },
+                  {
+                    "name": "⚡ Early Plugin Fixes",
+                    "value": "• Sync buffer overflow\n• Sync position gaps\n• Combat/food/tool desync",
+                    "inline": true
+                  },
+                  {
+                    "name": "📥 Installation",
+                    "value": "**Runtime:** `plugins/hyfixes.jar`\n**Early:** `earlyplugins/hyfixes-early.jar`",
+                    "inline": false
+                  }
+                ],
+                "footer": {
+                  "text": "HyFixes - Bug fixes for Hytale servers"
+                },
+                "url": "https://github.com/John-Willikers/hyfixes/releases/tag/${{ steps.version.outputs.VERSION }}",
+                "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"
+              }]
+            }' \
+            "$DISCORD_WEBHOOK"
