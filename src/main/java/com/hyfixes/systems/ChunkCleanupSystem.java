@@ -38,9 +38,11 @@ public class ChunkCleanupSystem extends EntityTickingSystem<EntityStore> {
     private final AtomicInteger tickCounter = new AtomicInteger(0);
     private final AtomicInteger cleanupCount = new AtomicInteger(0);
     private final AtomicInteger successCount = new AtomicInteger(0);
+    private final AtomicInteger threadErrorCount = new AtomicInteger(0);
     private final AtomicLong lastCleanupTime = new AtomicLong(0);
     private boolean loggedOnce = false;
     private boolean hasRunOnce = false;
+    private boolean loggedThreadWarning = false;
 
     // Cached method references (set by ChunkUnloadManager)
     // NOTE: chunkStoreInstance/waitForLoadingChunks removed - causes "Store is currently processing!" errors
@@ -106,15 +108,39 @@ public class ChunkCleanupSystem extends EntityTickingSystem<EntityStore> {
             try {
                 invalidateLoadedChunksMethod.invoke(chunkLightingInstance);
                 successes++;
-                plugin.getLogger().at(Level.INFO).log(
-                    "[ChunkCleanupSystem] SUCCESS: Called invalidateLoadedChunks() on main thread"
-                );
+                // Only log success occasionally to reduce spam
+                if (cleanupCount.get() % 10 == 1) {
+                    plugin.getLogger().at(Level.INFO).log(
+                        "[ChunkCleanupSystem] invalidateLoadedChunks() running normally"
+                    );
+                }
             } catch (Exception e) {
                 String cause = e.getCause() != null ? e.getCause().getMessage() : e.getMessage();
-                plugin.getLogger().at(Level.WARNING).log(
-                    "[ChunkCleanupSystem] Failed invalidateLoadedChunks(): " +
-                    e.getClass().getSimpleName() + " - " + cause
-                );
+
+                // Check if this is a thread assertion error (expected when instance worlds exist)
+                boolean isThreadError = cause != null &&
+                    (cause.contains("Assert not in thread") ||
+                     cause.contains("Assert not in ticking thread") ||
+                     cause.contains("WorldThread - instance"));
+
+                if (isThreadError) {
+                    // Thread errors are expected when instance worlds are active
+                    // Only log once to avoid spam, but track count
+                    threadErrorCount.incrementAndGet();
+                    if (!loggedThreadWarning) {
+                        plugin.getLogger().at(Level.INFO).log(
+                            "[ChunkCleanupSystem] Note: invalidateLoadedChunks() skipped due to instance world thread context. " +
+                            "This is normal when dungeons/instances are active. Tracking silently."
+                        );
+                        loggedThreadWarning = true;
+                    }
+                } else {
+                    // Unexpected error - log it
+                    plugin.getLogger().at(Level.WARNING).log(
+                        "[ChunkCleanupSystem] Failed invalidateLoadedChunks(): " +
+                        e.getClass().getSimpleName() + " - " + cause
+                    );
+                }
             }
         }
 
@@ -173,11 +199,13 @@ public class ChunkCleanupSystem extends EntityTickingSystem<EntityStore> {
             "  ChunkLighting Ready: %s\n" +
             "  Total Cleanups: %d\n" +
             "  Successful Calls: %d\n" +
+            "  Instance World Skips: %d\n" +
             "  Last Cleanup: %s\n" +
             "  Interval: %d seconds",
             chunkLightingInstance != null && invalidateLoadedChunksMethod != null,
             cleanupCount.get(),
             successCount.get(),
+            threadErrorCount.get(),
             lastRunStr,
             CLEANUP_INTERVAL_TICKS / 20
         );

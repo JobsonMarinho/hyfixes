@@ -2,6 +2,19 @@
 
 All notable changes to HyFixes will be documented in this file.
 
+## [1.4.5] - 2026-01-17
+
+### Fixed
+
+#### ChunkCleanupSystem Thread Warning Spam (Runtime Plugin)
+- **Problem:** ChunkCleanupSystem was logging 1000+ warnings when instance worlds (dungeons) were active
+- **Root cause:** `invalidateLoadedChunks()` internally touches instance world threads, causing thread assertion failures
+- **Details:** When players are in instances like `Forgotten_Temple` or `Portals_Taiga`, the cleanup method's internal calls cross thread boundaries
+- **Fix:** Now detects thread assertion errors and logs only once, tracking count silently
+- **Impact:** Clean logs - no more spam, thread errors tracked in `/hyfixes` status command
+
+---
+
 ## [1.4.4] - 2026-01-17
 
 ### Fixed
