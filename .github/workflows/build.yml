@@ -41,14 +41,56 @@ jobs:
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "Building version: $VERSION"
 
-      - name: Build with Gradle
+      # Build Runtime Plugin
+      - name: Build Runtime Plugin
         run: ./gradlew build -Pversion=${{ steps.version.outputs.VERSION }}
 
-      - name: Upload artifact
+      - name: Rename Runtime Plugin JAR
+        run: |
+          mkdir -p dist
+          cp build/libs/hyfixes.jar dist/hyfixes.jar
+          echo "Runtime plugin: $(ls -la dist/hyfixes.jar)"
+
+      # Build Early Plugin
+      - name: Build Early Plugin
+        run: |
+          cd hyfixes-early
+          ./gradlew build
+
+      - name: Copy Early Plugin JAR
+        run: |
+          cp hyfixes-early/build/libs/hyfixes-early-*.jar dist/hyfixes-early.jar
+          echo "Early plugin: $(ls -la dist/hyfixes-early.jar)"
+
+      # Create Bundle ZIP
+      - name: Create Bundle ZIP
+        run: |
+          mkdir -p bundle
+          cp dist/hyfixes.jar bundle/
+          cp dist/hyfixes-early.jar bundle/
+          cp INSTALL.md bundle/README.txt
+          cd bundle
+          zip -r ../dist/hyfixes-bundle-${{ steps.version.outputs.VERSION }}.zip .
+          echo "Bundle created: $(ls -la ../dist/hyfixes-bundle-*.zip)"
+
+      # Upload Individual Artifacts
+      - name: Upload Runtime Plugin
         uses: actions/upload-artifact@v4
         with:
-          name: hyfixes-jar
-          path: build/libs/*.jar
+          name: hyfixes-runtime
+          path: dist/hyfixes.jar
+
+      - name: Upload Early Plugin
+        uses: actions/upload-artifact@v4
+        with:
+          name: hyfixes-early
+          path: dist/hyfixes-early.jar
+
+      - name: Upload Bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: hyfixes-bundle
+          path: dist/hyfixes-bundle-*.zip
 
   release:
     needs: build
@@ -59,14 +101,65 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download artifact
+      - name: Get version from tag
+        id: version
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/}"
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Download Runtime Plugin
         uses: actions/download-artifact@v4
         with:
-          name: hyfixes-jar
-          path: ./artifacts
+          name: hyfixes-runtime
+          path: ./release
+
+      - name: Download Early Plugin
+        uses: actions/download-artifact@v4
+        with:
+          name: hyfixes-early
+          path: ./release
+
+      - name: Download Bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: hyfixes-bundle
+          path: ./release
+
+      - name: List release files
+        run: ls -la ./release/
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: ./artifacts/*.jar
+          files: |
+            ./release/hyfixes.jar
+            ./release/hyfixes-early.jar
+            ./release/hyfixes-bundle-*.zip
+          body: |
+            ## HyFixes ${{ steps.version.outputs.VERSION }}
+
+            ### Downloads
+
+            | File | Description |
+            |------|-------------|
+            | `hyfixes.jar` | Runtime plugin - place in `plugins/` folder |
+            | `hyfixes-early.jar` | Early plugin - place in `earlyplugins/` folder |
+            | `hyfixes-bundle-*.zip` | Both plugins + installation instructions |
+
+            ### Installation
+
+            **Runtime Plugin (Required):**
+            1. Download `hyfixes.jar`
+            2. Place in your server's `plugins/` folder
+            3. Restart the server
+
+            **Early Plugin (Recommended):**
+            1. Download `hyfixes-early.jar`
+            2. Place in your server's `earlyplugins/` folder
+            3. Set `ACCEPT_EARLY_PLUGINS=1` or press Enter at startup warning
+
+            ### Support
+
+            - **Discord:** https://discord.gg/u5R7kuuGXU
+            - **Issues:** https://github.com/John-Willikers/hyfixes/issues
           generate_release_notes: true
