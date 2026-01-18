@@ -60,7 +60,8 @@ Fixes deep networking bugs that cause combat/interaction desync.
 - **Null SpawnController** - Fixes world crashes when spawn beacons load
 - **Null Spawn Parameters** - Fixes world crashes in volcanic/cave biomes
 - **Duplicate Block Components** - Fixes player kicks when using teleporters
-- **Null npcReferences** - Fixes world crashes when spawn markers are removed
+- **Null npcReferences (Removal)** - Fixes crash on spawn marker removal
+- **Null npcReferences (Constructor)** - ROOT CAUSE FIX: Initializes array in SpawnMarkerEntity constructor
 
 ---
 
@@ -78,7 +79,7 @@ Look for these messages in your server log at startup:
 
 ### Early Plugin
 
-Look for these messages in your server log at startup (6 transformers):
+Look for these messages in your server log at startup (7 transformers):
 
 ```
 [HyFixes-Early] Transforming InteractionChain class...
@@ -98,6 +99,9 @@ Look for these messages in your server log at startup (6 transformers):
 
 [HyFixes-Early] Transforming SpawnReferenceSystems$MarkerAddRemoveSystem...
 [HyFixes-Early] MarkerAddRemoveSystem transformation COMPLETE!
+
+[HyFixes-Early] Transforming SpawnMarkerEntity...
+[HyFixes-Early] SpawnMarkerEntity transformation COMPLETE!
 ```
 
 ---

@@ -65,9 +65,14 @@ Fixes crashes that can be intercepted at runtime:
 
 ### Early Plugin (hyfixes-early.jar)
 
-Fixes deep networking bugs via bytecode transformation:
+Fixes deep core bugs via bytecode transformation:
 - Sync buffer overflow (combat/food/tool desync)
 - Sync position gaps (kicks player)
+- Instance portal race condition (player already in world)
+- Null spawn controller (beacon crash)
+- Null spawn parameters (volcanic/cave biome crash)
+- Duplicate block components (teleporter crash)
+- Null npcReferences (spawn marker crash - ROOT CAUSE FIX)
 
 ---
 

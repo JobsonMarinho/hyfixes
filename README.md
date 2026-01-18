@@ -66,7 +66,8 @@ Some Hytale bugs occur in code paths that cannot be intercepted at runtime. The 
 | Null SpawnController | Critical | World crashes when spawn beacons load |
 | Null Spawn Parameters | Critical | World crashes in volcanic/cave biomes |
 | Duplicate Block Components | Critical | Player kicked when using teleporters |
-| Null npcReferences | Critical | World crashes when spawn markers are removed |
+| Null npcReferences (Removal) | Critical | World crashes when spawn markers are removed |
+| Null npcReferences (Constructor) | Critical | ROOT CAUSE: SpawnMarkerEntity never initializes array |
 
 ---
 
@@ -158,7 +159,7 @@ Look for these log messages at startup:
 
 ### Early Plugin Loaded
 
-Look for these log messages at startup (6 transformers):
+Look for these log messages at startup (7 transformers):
 ```
 [HyFixes-Early] Transforming InteractionChain class...
 [HyFixes-Early] InteractionChain transformation COMPLETE!
@@ -177,6 +178,9 @@ Look for these log messages at startup (6 transformers):
 
 [HyFixes-Early] Transforming SpawnReferenceSystems$MarkerAddRemoveSystem...
 [HyFixes-Early] MarkerAddRemoveSystem transformation COMPLETE!
+
+[HyFixes-Early] Transforming SpawnMarkerEntity...
+[HyFixes-Early] SpawnMarkerEntity transformation COMPLETE!
 ```
 
 ---

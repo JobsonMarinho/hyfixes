@@ -8,7 +8,7 @@ Each bug includes:
 - Reproduction steps (where known)
 - Suggested fixes for Hytale developers
 
-**Last Updated:** 2026-01-17
+**Last Updated:** 2026-01-18
 **Hytale Version:** Early Access (2025+)
 **Analysis Tool:** HyFixes Plugin Development
 
@@ -22,6 +22,7 @@ Each bug includes:
 3. [SpawnReferenceSystems Null Controller](#6-spawnreferencesystems-null-controller-critical) - **FIXED**
 4. [BeaconSpawnController Null Spawn](#7-beaconspawncontroller-null-spawn-critical) - **FIXED**
 5. [BlockComponentChunk Duplicate Components](#8-blockcomponentchunk-duplicate-components-critical) - **FIXED**
+6. [SpawnMarkerEntity Null npcReferences](#9-spawnmarkerentity-null-npcreferences-critical) - **FIXED** (ROOT CAUSE)
 
 ### Requires Hytale Developers
 2. [Missing Replacement Interactions](#2-missing-replacement-interactions-medium)
@@ -468,6 +469,84 @@ When interacting with teleporters, Hytale sometimes tries to add a block compone
 ### HyFixes Bytecode Fix
 
 The early plugin transforms `addEntityReference()` to log a warning and return instead of throwing, making it idempotent.
+
+---
+
+## 9. SpawnMarkerEntity Null npcReferences (CRITICAL)
+
+> **STATUS: FIXED** - HyFixes Early Plugin v1.5.0+ patches this via bytecode transformation (ROOT CAUSE FIX)
+
+### Summary
+
+The `SpawnMarkerEntity` class has an `npcReferences` field that is **never initialized** in the constructor, defaulting to `null`. This causes crashes when spawn markers are removed.
+
+### Error Pattern
+
+```
+java.lang.NullPointerException: Cannot read the array length because "<local15>" is null
+    at SpawnReferenceSystems$MarkerAddRemoveSystem.onEntityRemove(SpawnReferenceSystems.java:166)
+```
+
+### Frequency
+
+- **7,853+ entities affected per session** on production servers
+- Occurs every time spawn markers are created then removed
+- Especially common in areas with mob spawners
+
+### Root Cause
+
+The `SpawnMarkerEntity` constructor doesn't initialize the `npcReferences` field:
+
+```java
+public class SpawnMarkerEntity {
+    private InvalidatablePersistentRef<EntityStore>[] npcReferences;  // NEVER INITIALIZED!
+
+    public SpawnMarkerEntity() {
+        // npcReferences stays null!
+    }
+
+    public InvalidatablePersistentRef<EntityStore>[] getNpcReferences() {
+        return npcReferences;  // Returns null
+    }
+}
+```
+
+When `MarkerAddRemoveSystem.onEntityRemove()` calls `getNpcReferences()` and tries to iterate:
+
+```java
+InvalidatablePersistentRef<EntityStore>[] refs = entity.getNpcReferences();
+for (int i = 0; i < refs.length; i++) {  // CRASH: refs is null
+    // ...
+}
+```
+
+### Previous Fixes (Band-aids)
+
+| Version | Fix | Approach |
+|---------|-----|----------|
+| v1.3.8 | SpawnMarkerReferenceSanitizer | Runtime: Check every tick, initialize if null |
+| v1.4.6 | MarkerAddRemoveSystemTransformer | Bytecode: Null check in onEntityRemove() |
+
+Both prevented the crash but didn't fix the root cause.
+
+### HyFixes ROOT CAUSE Fix (v1.5.0)
+
+The early plugin now transforms the `SpawnMarkerEntity` constructor to initialize the field:
+
+```java
+// Injected bytecode at constructor start
+this.npcReferences = new InvalidatablePersistentRef[0];
+```
+
+**This is the definitive fix** - the array is never null because it's initialized when the entity is created.
+
+### Performance Impact
+
+| Approach | When It Runs | Performance |
+|----------|--------------|-------------|
+| Runtime Sanitizer | Every tick, every spawn marker | High overhead |
+| Removal Null Check | On entity removal | Low overhead |
+| Constructor Fix | Once at entity creation | **Negligible overhead** |
 
 ---
 

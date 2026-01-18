@@ -612,6 +612,67 @@ The bytecode transformation detects the "Duplicate block components" string patt
 
 ---
 
+### 19. SpawnMarkerEntity Null npcReferences - ROOT CAUSE FIX (v1.5.0-early)
+
+**Severity:** Critical - Crashes world thread when spawn markers are removed
+
+**The Bug:**
+
+GitHub Issue: https://github.com/John-Willikers/hyfixes/issues/5
+
+This is the **ROOT CAUSE** of the null `npcReferences` crash. The `SpawnMarkerEntity` class has an `npcReferences` field that is **never initialized** in the constructor, leaving it as `null`.
+
+```java
+// SpawnMarkerEntity.java - field declaration
+private InvalidatablePersistentRef<EntityStore>[] npcReferences;  // NEVER INITIALIZED!
+```
+
+When `SpawnReferenceSystems$MarkerAddRemoveSystem.onEntityRemove()` tries to iterate over this array:
+
+```java
+InvalidatablePersistentRef<EntityStore>[] refs = spawnMarkerEntity.getNpcReferences();
+for (int i = 0; i < refs.length; i++) {  // CRASH: refs is null!
+    // ...
+}
+```
+
+**Impact:** World thread crashes when spawn markers are removed. This was responsible for **7,853+ entities needing runtime sanitization per session**.
+
+**Previous Fix (v1.4.6):**
+
+We added a null check in `MarkerAddRemoveSystem.onEntityRemove()` to return early if `getNpcReferences()` returns null. This was a band-aid that prevented the crash but didn't fix the root cause.
+
+**ROOT CAUSE Fix (v1.5.0):**
+
+The early plugin now transforms the `SpawnMarkerEntity` constructor to initialize the `npcReferences` field:
+
+```java
+// Injected at start of constructor
+this.npcReferences = new InvalidatablePersistentRef[0];
+```
+
+**Technical Implementation:**
+
+The `SpawnMarkerEntityTransformer` uses ASM to:
+1. Detect the `SpawnMarkerEntity` class by its internal name
+2. Find the constructor method (`<init>`)
+3. Inject bytecode after the superclass constructor call (`invokespecial`) to:
+   - Load `this` (ALOAD 0)
+   - Create new empty array (ICONST_0, ANEWARRAY)
+   - Store to field (PUTFIELD npcReferences)
+
+**Why This Is Better:**
+
+| Approach | Performance | Coverage |
+|----------|-------------|----------|
+| Runtime Sanitizer (v1.3.8) | Runs every tick on every spawn marker | Reactive - fixes after creation |
+| Removal Null Check (v1.4.6) | Runs on entity removal | Reactive - prevents crash at removal |
+| Constructor Fix (v1.5.0) | Runs once at entity creation | Proactive - prevents null from ever existing |
+
+The constructor fix is **massively more efficient** - it runs once when the entity is created, not every tick or on removal.
+
+---
+
 ## Technical Reference
 
 ### Runtime Plugin Systems
@@ -630,7 +691,7 @@ The bytecode transformation detects the "Duplicate block components" string patt
 | InteractionChainMonitor | `EntityTickingSystem<EntityStore>` | EntityStoreRegistry | Tracks HyFixes statistics |
 | CraftingManagerSanitizer | `EntityTickingSystem<EntityStore>` | EntityStoreRegistry | Every tick, clears stale bench refs |
 | InteractionManagerSanitizer | `EntityTickingSystem<EntityStore>` | EntityStoreRegistry | Every tick, validates interaction chains |
-| SpawnMarkerReferenceSanitizer | `EntityTickingSystem<EntityStore>` | EntityStoreRegistry | Every tick, fixes null npcReferences |
+| SpawnMarkerReferenceSanitizer | `EntityTickingSystem<EntityStore>` | EntityStoreRegistry | **DEPRECATED** - Now fixed via SpawnMarkerEntityTransformer in early plugin |
 | ChunkTrackerSanitizer | `RefSystem<EntityStore>` | EntityStoreRegistry | Validates PlayerRef on chunk operations |
 
 ### Early Plugin Transformers
@@ -643,6 +704,8 @@ The bytecode transformation detects the "Duplicate block components" string patt
 | SpawnReferenceSystemsTransformer | `SpawnReferenceSystems$BeaconAddRemoveSystem` | `onEntityAdded` | Null check injection after `getSpawnController()` |
 | BeaconSpawnControllerTransformer | `BeaconSpawnController` | `createRandomSpawnJob` | Null check injection after `getRandomSpawn()` |
 | BlockComponentChunkTransformer | `BlockComponentChunk` | `addEntityReference` | Exception throw replaced with warning log |
+| MarkerAddRemoveSystemTransformer | `SpawnReferenceSystems$MarkerAddRemoveSystem` | `onEntityRemove` | Null check injection after `getNpcReferences()` |
+| SpawnMarkerEntityTransformer | `SpawnMarkerEntity` | `<init>` (constructor) | Field initialization for `npcReferences` (ROOT CAUSE FIX) |
 
 ---
 

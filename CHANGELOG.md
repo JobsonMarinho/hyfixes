@@ -2,6 +2,30 @@
 
 All notable changes to HyFixes will be documented in this file.
 
+## [1.5.0] - 2026-01-18
+
+### Changed
+
+#### SpawnMarkerEntity Bytecode Transformation - ROOT CAUSE FIX (Early Plugin)
+- **Target:** `SpawnMarkerEntity` constructor
+- **Bug:** `NullPointerException: Cannot read the array length because "<local15>" is null`
+- **Crash location:** `SpawnReferenceSystems$MarkerAddRemoveSystem.onEntityRemove()` at line 166
+- **Root cause:** `SpawnMarkerEntity.npcReferences` field is never initialized in constructor, defaults to null
+- **Fix:** Bytecode transformation injects field initialization in constructor: `npcReferences = new InvalidatablePersistentRef[0]`
+- **Impact:** This is the ROOT CAUSE fix! SpawnMarkerEntity instances now have properly initialized arrays from the start
+- **Replaces:** Runtime SpawnMarkerReferenceSanitizer which was fixing **7,853 entities per session**
+- **Performance:** Massive improvement - initialization happens once at construction, not every tick
+
+#### SpawnMarkerSystems Transformer Deprecated
+- The v1.4.6 `MarkerAddRemoveSystemTransformer` (null check on removal) is superseded by v1.5.0's constructor fix
+- Both remain active for defense-in-depth, but the constructor fix prevents null arrays from ever existing
+
+#### Runtime Plugin Changes
+- **SpawnMarkerReferenceSanitizer** moved to early plugin in v1.4.0 (bytecode transformation)
+- Status command updated to reflect this architecture change
+
+---
+
 ## [1.4.6] - 2026-01-17
 
 ### Added
