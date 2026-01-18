@@ -56,6 +56,7 @@ public class CleanInteractionsCommand extends AbstractPlayerCommand {
         super("cleaninteractions", "hyfixes.command.cleaninteractions.desc");
         this.plugin = plugin;
         addAliases("ci", "cleanint", "fixinteractions");
+        setAllowsExtraArguments(true);  // Allow manual argument parsing
     }
 
     @Override

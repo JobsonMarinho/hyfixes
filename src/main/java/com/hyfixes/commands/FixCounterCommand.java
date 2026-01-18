@@ -42,6 +42,7 @@ public class FixCounterCommand extends AbstractPlayerCommand {
         super("fixcounter", "hyfixes.command.fixcounter.desc");
         this.plugin = plugin;
         addAliases("fc", "blockcounter", "teleporterlimit");
+        setAllowsExtraArguments(true);  // Allow manual argument parsing
     }
 
     @Override
