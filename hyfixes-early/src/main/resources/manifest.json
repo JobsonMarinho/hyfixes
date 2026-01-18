@@ -1,9 +1,9 @@
 {
   "Group": "com.hyfixes",
-  "Name": "HyFixes",
+  "Name": "HyFixes-Early",
   "Version": "1.1.0",
-  "Description": "Essential bug fixes for Hytale Early Access servers. Prevents crashes, player kicks, and sync issues.",
-  "Main": "com.hyfixes.HyFixes",
+  "Description": "Bytecode transformers for HyFixes - Fixes deep networking bugs and combat desync issues.",
+  "Main": "com.hyfixes.early.HyFixesEarly",
   "Authors": [
     {
       "Name": "John-Willikers",

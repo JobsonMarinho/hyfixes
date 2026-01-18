@@ -1,0 +1,28 @@
+{
+  "Group": "com.hyfixes",
+  "Name": "HyFixes",
+  "Version": "1.1.0",
+  "Description": "Essential bug fixes for Hytale Early Access servers. Includes runtime plugin and early plugin bytecode transformers. Prevents crashes, player kicks, combat desync, and sync issues.",
+  "Authors": [
+    {
+      "Name": "John-Willikers",
+      "Url": "https://github.com/John-Willikers"
+    }
+  ],
+  "Website": "https://github.com/John-Willikers/hyfixes",
+  "ServerVersion": "*",
+  "Dependencies": {},
+  "OptionalDependencies": {},
+  "DisabledByDefault": false,
+  "IncludesAssetPack": false,
+  "SubPlugins": {
+    "com.hyfixes:HyFixes-Runtime": {
+      "Path": "mods/hyfixes-1.1.0.jar",
+      "Description": "Runtime plugin - Place in mods/ folder"
+    },
+    "com.hyfixes:HyFixes-Early": {
+      "Path": "earlyplugins/hyfixes-early-1.1.0.jar",
+      "Description": "Early plugin bytecode transformers - Place in earlyplugins/ folder"
+    }
+  }
+}
