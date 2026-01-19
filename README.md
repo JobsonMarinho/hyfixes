@@ -2,7 +2,7 @@
 
 Essential bug fixes for Hytale Early Access servers. Prevents crashes, player kicks, and desync issues caused by known bugs in Hytale's core systems.
 
-[![Discord](https://img.shields.io/badge/Discord-Join%20for%20Support-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/u5R7kuuGXU)
+[![Discord](https://img.shields.io/badge/Discord-Join%20for%20Support-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/r6KzU4n7V8)
 [![GitHub Issues](https://img.shields.io/badge/GitHub-Report%20Bugs-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/John-Willikers/hyfixes/issues)
 
 ---
@@ -69,6 +69,7 @@ Some Hytale bugs occur in code paths that cannot be intercepted at runtime. The 
 | Null npcReferences (Removal) | Critical | World crashes when spawn markers are removed |
 | Null npcReferences (Constructor) | Critical | ROOT CAUSE: SpawnMarkerEntity never initializes array |
 | BlockCounter Not Decrementing | Medium | Teleporter limit stuck at 5, can't place new ones |
+| WorldMapTracker Iterator Crash | Critical | Server crashes every ~30 min on high-pop servers |
 
 ---
 
@@ -137,6 +138,40 @@ if (adjustedIndex < 0) {
 
 ---
 
+## Configuration
+
+### BetterMap Compatibility (v1.6.2+)
+
+If you use **BetterMap** or other world map plugins, you may need to disable HyFixes' aggressive chunk unloading. The ChunkUnloadManager can clear chunk data that map plugins need for rendering, causing black/empty maps.
+
+**To disable ChunkUnloadManager:**
+
+**Option 1: Environment Variable**
+```bash
+export HYFIXES_DISABLE_CHUNK_UNLOAD=true
+```
+
+**Option 2: JVM Argument**
+```bash
+java -Dhyfixes.disableChunkUnload=true -jar server.jar
+```
+
+**Option 3: Pterodactyl Panel**
+Add to Startup Variables:
+```
+HYFIXES_DISABLE_CHUNK_UNLOAD=true
+```
+
+**Trade-off:** Disabling ChunkUnloadManager means server memory may grow on servers where players explore large areas. Monitor your server's memory usage if you disable this feature.
+
+**Verification:** When disabled, you'll see these log messages at startup:
+```
+[DISABLED] ChunkUnloadManager - disabled via config (HYFIXES_DISABLE_CHUNK_UNLOAD=true)
+[DISABLED] This improves compatibility with BetterMap and other map plugins
+```
+
+---
+
 ## Admin Commands
 
 | Command | Aliases | Description |
@@ -144,6 +179,7 @@ if (adjustedIndex < 0) {
 | `/hyfixes` | `/hfs`, `/interactionstatus` | Show HyFixes statistics and status |
 | `/chunkstatus` | | Show chunk counts and memory info |
 | `/chunkunload` | | Force immediate chunk cleanup |
+| `/fixcounter` | `/fc`, `/blockcounter` | Fix/view teleporter BlockCounter values |
 
 ---
 
@@ -160,7 +196,7 @@ Look for these log messages at startup:
 
 ### Early Plugin Loaded
 
-Look for these log messages at startup (7 transformers):
+Look for these log messages at startup (10 transformers):
 ```
 [HyFixes-Early] Transforming InteractionChain class...
 [HyFixes-Early] InteractionChain transformation COMPLETE!
@@ -182,6 +218,12 @@ Look for these log messages at startup (7 transformers):
 
 [HyFixes-Early] Transforming SpawnMarkerEntity...
 [HyFixes-Early] SpawnMarkerEntity transformation COMPLETE!
+
+[HyFixes-Early] Transforming TrackedPlacement$OnAddRemove...
+[HyFixes-Early] TrackedPlacement transformation COMPLETE!
+
+[HyFixes-Early] Transforming WorldMapTracker...
+[HyFixes-Early] WorldMapTracker transformation COMPLETE!
 ```
 
 ---
@@ -203,7 +245,7 @@ Look for these log messages at startup (7 transformers):
 - Steps to reproduce (if known)
 - HyFixes version
 
-**Need help?** Join our [Discord](https://discord.gg/u5R7kuuGXU) for community support!
+**Need help?** Join our [Discord](https://discord.gg/r6KzU4n7V8) for community support!
 
 ---
 
@@ -254,4 +296,4 @@ Found another Hytale bug that needs patching? We'd love your help!
 2. Fork the repo and create a fix
 3. Submit a PR with your changes
 
-Join our [Discord](https://discord.gg/u5R7kuuGXU) to discuss ideas!
+Join our [Discord](https://discord.gg/r6KzU4n7V8) to discuss ideas!

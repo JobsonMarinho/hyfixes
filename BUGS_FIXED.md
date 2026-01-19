@@ -4,7 +4,7 @@ This document contains detailed technical information about every bug that HyFix
 
 > **Found a bug?** Report it on [GitHub Issues](https://github.com/John-Willikers/hyfixes/issues)
 >
-> **Need help?** Join our [Discord](https://discord.gg/u5R7kuuGXU)
+> **Need help?** Join our [Discord](https://discord.gg/r6KzU4n7V8)
 
 ---
 
@@ -750,6 +750,79 @@ public void onEntityRemove(...) {
 
 ---
 
+### 20. WorldMapTracker Iterator Crash (v1.6.0)
+
+**Severity:** Critical - Server crashes every ~30 minutes on high-population servers
+
+**The Bug:**
+
+GitHub Issue: https://github.com/John-Willikers/hyfixes/issues/16
+
+Hytale's `WorldMapTracker.unloadImages()` crashes due to FastUtil `LongOpenHashSet` iterator corruption:
+
+```java
+// WorldMapTracker.unloadImages() - problematic iteration
+LongOpenHashSet toRemove = new LongOpenHashSet();
+// ... collect positions to remove ...
+
+for (LongIterator iter = toRemove.iterator(); iter.hasNext(); ) {
+    long pos = iter.nextLong();
+    iter.remove();  // Can cause internal corruption during rehash!
+}
+```
+
+Error seen in logs:
+```
+java.lang.NullPointerException
+    at it.unimi.dsi.fastutil.longs.LongOpenHashSet$SetIterator.remove(LongOpenHashSet.java:...)
+    at WorldMapTracker.unloadImages(WorldMapTracker.java:...)
+```
+
+**Root Cause:**
+
+FastUtil's `LongOpenHashSet.iterator().remove()` can corrupt the iterator's internal state when the underlying hash set rehashes. This is a known edge case in FastUtil where:
+
+1. Iterator is created over the set
+2. `remove()` is called which may trigger rehash
+3. Internal position tracking becomes invalid
+4. Next access throws NPE
+
+**Impact:**
+
+- Server crashes approximately every 30 minutes on servers with 35+ players
+- Crash occurs during world map chunk unloading operations
+- All players in affected world are kicked
+
+**The Fix (Early Plugin):**
+
+`WorldMapTrackerTransformer` wraps the entire `unloadImages()` method in a try-catch:
+
+```java
+public void unloadImages(int x, int y, int z) {
+    try {
+        // Original method body...
+    } catch (NullPointerException e) {
+        System.out.println("[HyFixes-Early] WARNING: WorldMapTracker iterator corruption, skipping cleanup");
+        return;  // Graceful return instead of crash
+    }
+}
+```
+
+The bytecode transformation:
+1. Detects `WorldMapTracker` class by internal name
+2. Finds `unloadImages(III)V` method
+3. Wraps entire method in try-catch for NPE
+4. Logs warning and returns gracefully on catch
+
+**Why This Approach:**
+
+- Cannot fix FastUtil's internal iterator bug
+- Wrapping in try-catch is the safest approach
+- Skipping one cleanup cycle is harmless (will retry next cycle)
+- Prevents server crash without side effects
+
+---
+
 ## Technical Reference
 
 ### Runtime Plugin Systems
@@ -785,6 +858,7 @@ public void onEntityRemove(...) {
 | MarkerAddRemoveSystemTransformer | `SpawnReferenceSystems$MarkerAddRemoveSystem` | `onEntityRemove` | Null check injection after `getNpcReferences()` |
 | SpawnMarkerEntityTransformer | `SpawnMarkerEntity` | `<init>` (constructor) | Field initialization for `npcReferences` (ROOT CAUSE FIX) |
 | TrackedPlacementTransformer | `TrackedPlacement$OnAddRemove` | `onEntityRemove` | Full method replacement with null-safe version |
+| WorldMapTrackerTransformer | `WorldMapTracker` | `unloadImages` | Try-catch wrapper for FastUtil iterator corruption |
 
 ---
 

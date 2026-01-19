@@ -73,12 +73,14 @@ Fixes deep core bugs via bytecode transformation:
 - Null spawn parameters (volcanic/cave biome crash)
 - Duplicate block components (teleporter crash)
 - Null npcReferences (spawn marker crash - ROOT CAUSE FIX)
+- BlockCounter not decrementing (teleporter limit stuck)
+- WorldMapTracker iterator crash (30-min crash on high-pop servers)
 
 ---
 
 ## Support
 
-**Discord:** https://discord.gg/u5R7kuuGXU
+**Discord:** https://discord.gg/r6KzU4n7V8
 
 **GitHub:** https://github.com/John-Willikers/hyfixes
 

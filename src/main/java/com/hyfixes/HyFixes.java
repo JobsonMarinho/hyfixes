@@ -111,18 +111,30 @@ public class HyFixes extends JavaPlugin {
 
         // Fix 6: Chunk memory bloat - chunks not unloading (v1.2.0)
         // Uses reflection to discover and call chunk unload APIs
-        chunkUnloadManager = new ChunkUnloadManager(this);
+        // NOTE: Can be disabled via HYFIXES_DISABLE_CHUNK_UNLOAD=true for BetterMap compatibility (Issue #21)
+        boolean disableChunkUnload = "true".equalsIgnoreCase(System.getenv("HYFIXES_DISABLE_CHUNK_UNLOAD")) ||
+                                     "true".equalsIgnoreCase(System.getProperty("hyfixes.disableChunkUnload"));
 
-        // Fix 6b: Main-thread chunk cleanup system (v1.2.2)
-        // Runs cleanup methods on the main server thread to avoid InvocationTargetException
-        chunkCleanupSystem = new ChunkCleanupSystem(this);
-        getEntityStoreRegistry().registerSystem(chunkCleanupSystem);
-        getLogger().at(Level.INFO).log("[FIX] ChunkCleanupSystem registered - runs cleanup on main thread");
+        if (disableChunkUnload) {
+            getLogger().at(Level.INFO).log("[DISABLED] ChunkUnloadManager - disabled via config (HYFIXES_DISABLE_CHUNK_UNLOAD=true)");
+            getLogger().at(Level.INFO).log("[DISABLED] This improves compatibility with BetterMap and other map plugins");
+            chunkUnloadManager = null;
+            chunkCleanupSystem = null;
+        } else {
+            chunkUnloadManager = new ChunkUnloadManager(this);
 
-        // Wire up the systems
-        chunkUnloadManager.setChunkCleanupSystem(chunkCleanupSystem);
-        chunkUnloadManager.start();
-        getLogger().at(Level.INFO).log("[FIX] ChunkUnloadManager registered - aggressively unloads unused chunks");
+            // Fix 6b: Main-thread chunk cleanup system (v1.2.2)
+            // Runs cleanup methods on the main server thread to avoid InvocationTargetException
+            chunkCleanupSystem = new ChunkCleanupSystem(this);
+            getEntityStoreRegistry().registerSystem(chunkCleanupSystem);
+            getLogger().at(Level.INFO).log("[FIX] ChunkCleanupSystem registered - runs cleanup on main thread");
+
+            // Wire up the systems
+            chunkUnloadManager.setChunkCleanupSystem(chunkCleanupSystem);
+            chunkUnloadManager.start();
+            getLogger().at(Level.INFO).log("[FIX] ChunkUnloadManager registered - aggressively unloads unused chunks");
+            getLogger().at(Level.INFO).log("[TIP] To disable for BetterMap compatibility, set HYFIXES_DISABLE_CHUNK_UNLOAD=true");
+        }
 
         // Fix 7: GatherObjectiveTask null ref crash (v1.3.0)
         // Validates refs in quest objectives before they can crash
@@ -215,7 +227,16 @@ public class HyFixes extends JavaPlugin {
     }
 
     private int getFixCount() {
-        return 14; // PickupItemSanitizer, PickupItemChunkHandler, RespawnBlockSanitizer, ProcessingBenchSanitizer, EmptyArchetypeSanitizer, InstancePositionTracker, ChunkUnloadManager, ChunkCleanupSystem, GatherObjectiveTaskSanitizer, InteractionChainMonitor, CraftingManagerSanitizer, InteractionManagerSanitizer, SpawnBeaconSanitizer, ChunkTrackerSanitizer (SpawnMarkerReferenceSanitizer moved to early plugin, InstanceTeleportSanitizer disabled)
+        // Base fixes: PickupItemSanitizer, PickupItemChunkHandler, RespawnBlockSanitizer, ProcessingBenchSanitizer,
+        // EmptyArchetypeSanitizer, InstancePositionTracker, GatherObjectiveTaskSanitizer, InteractionChainMonitor,
+        // CraftingManagerSanitizer, InteractionManagerSanitizer, SpawnBeaconSanitizer, ChunkTrackerSanitizer
+        // (SpawnMarkerReferenceSanitizer moved to early plugin, InstanceTeleportSanitizer disabled)
+        int count = 12;
+        // ChunkUnloadManager + ChunkCleanupSystem (optional, can be disabled for BetterMap compatibility)
+        if (chunkUnloadManager != null) {
+            count += 2;
+        }
+        return count;
     }
 
     public static HyFixes getInstance() {

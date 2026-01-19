@@ -6,7 +6,7 @@ Essential bug fixes for Hytale Early Access servers. Prevents crashes and player
 
 **Need help?** Join our Discord for community support!
 
-**Discord:** https://discord.gg/u5R7kuuGXU
+**Discord:** https://discord.gg/r6KzU4n7V8
 
 **Found a bug?** Report it on GitHub:
 
@@ -62,6 +62,8 @@ Fixes deep networking bugs that cause combat/interaction desync.
 - **Duplicate Block Components** - Fixes player kicks when using teleporters
 - **Null npcReferences (Removal)** - Fixes crash on spawn marker removal
 - **Null npcReferences (Constructor)** - ROOT CAUSE FIX: Initializes array in SpawnMarkerEntity constructor
+- **BlockCounter Not Decrementing** - Fixes teleporter limit stuck at 5
+- **WorldMapTracker Iterator Crash** - Fixes server crashes every ~30 min on high-pop servers
 
 ---
 
@@ -79,7 +81,7 @@ Look for these messages in your server log at startup:
 
 ### Early Plugin
 
-Look for these messages in your server log at startup (7 transformers):
+Look for these messages in your server log at startup (10 transformers):
 
 ```
 [HyFixes-Early] Transforming InteractionChain class...
@@ -102,6 +104,12 @@ Look for these messages in your server log at startup (7 transformers):
 
 [HyFixes-Early] Transforming SpawnMarkerEntity...
 [HyFixes-Early] SpawnMarkerEntity transformation COMPLETE!
+
+[HyFixes-Early] Transforming TrackedPlacement$OnAddRemove...
+[HyFixes-Early] TrackedPlacement transformation COMPLETE!
+
+[HyFixes-Early] Transforming WorldMapTracker...
+[HyFixes-Early] WorldMapTracker transformation COMPLETE!
 ```
 
 ---
@@ -113,8 +121,9 @@ Look for these messages in your server log at startup (7 transformers):
 | `/hyfixes` | Show HyFixes statistics and crash prevention counts |
 | `/chunkstatus` | Show loaded chunk counts and memory info |
 | `/chunkunload` | Force immediate chunk cleanup |
+| `/fixcounter` | Fix/view teleporter BlockCounter values |
 
-Aliases: `/hfs`, `/interactionstatus`
+Aliases: `/hfs`, `/interactionstatus`, `/fc`, `/blockcounter`
 
 ---
 
@@ -174,4 +183,4 @@ For detailed technical documentation, source code, and contribution guidelines:
 - Join our Discord community
 - Share HyFixes with other server admins!
 
-**Discord:** https://discord.gg/u5R7kuuGXU
+**Discord:** https://discord.gg/r6KzU4n7V8

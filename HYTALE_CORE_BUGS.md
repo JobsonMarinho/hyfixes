@@ -8,7 +8,7 @@ Each bug includes:
 - Reproduction steps (where known)
 - Suggested fixes for Hytale developers
 
-**Last Updated:** 2026-01-18
+**Last Updated:** 2026-01-19
 **Hytale Version:** Early Access (2025+)
 **Analysis Tool:** HyFixes Plugin Development
 
@@ -23,6 +23,9 @@ Each bug includes:
 4. [BeaconSpawnController Null Spawn](#7-beaconspawncontroller-null-spawn-critical) - **FIXED**
 5. [BlockComponentChunk Duplicate Components](#8-blockcomponentchunk-duplicate-components-critical) - **FIXED**
 6. [SpawnMarkerEntity Null npcReferences](#9-spawnmarkerentity-null-npcreferences-critical) - **FIXED** (ROOT CAUSE)
+7. [TrackedPlacement BlockCounter](#10-trackedplacement-blockcounter-medium) - **FIXED**
+8. [WorldMapTracker Iterator Crash](#11-worldmaptracker-iterator-crash-critical) - **FIXED**
+9. [ArchetypeChunk Stale Entity Crash](#12-archetypechunk-stale-entity-crash-critical) - **FIXED**
 
 ### Requires Hytale Developers
 2. [Missing Replacement Interactions](#2-missing-replacement-interactions-medium)
@@ -547,6 +550,136 @@ this.npcReferences = new InvalidatablePersistentRef[0];
 | Runtime Sanitizer | Every tick, every spawn marker | High overhead |
 | Removal Null Check | On entity removal | Low overhead |
 | Constructor Fix | Once at entity creation | **Negligible overhead** |
+
+---
+
+## 10. TrackedPlacement BlockCounter (MEDIUM)
+
+> **STATUS: FIXED** - HyFixes Early Plugin v1.6.0+ patches this via bytecode transformation
+
+### Summary
+
+When teleporters are deleted, the `BlockCounter` placement count is not decremented, causing players to permanently hit the 5 teleporter limit.
+
+### Error Pattern
+
+No error is thrown - the bug is silent. Players simply cannot place new teleporters after reaching the limit, even after deleting all existing ones.
+
+### Root Cause
+
+`TrackedPlacement$OnAddRemove.onEntityRemove()` assumes the `TrackedPlacement` component is always present during entity removal, but due to component removal ordering, it may already be null.
+
+### HyFixes Bytecode Fix
+
+The early plugin transforms `onEntityRemove()` to add null checks and gracefully handle missing components.
+
+---
+
+## 11. WorldMapTracker Iterator Crash (CRITICAL)
+
+> **STATUS: FIXED** - HyFixes Early Plugin v1.6.0+ patches this via bytecode transformation
+
+### Summary
+
+Hytale's `WorldMapTracker.unloadImages()` crashes due to FastUtil `LongOpenHashSet` iterator corruption during chunk unloading.
+
+### Error Pattern
+
+```
+java.lang.NullPointerException
+    at it.unimi.dsi.fastutil.longs.LongOpenHashSet$SetIterator.remove(LongOpenHashSet.java:...)
+    at WorldMapTracker.unloadImages(WorldMapTracker.java:...)
+```
+
+### Frequency
+
+- Crashes approximately every **30 minutes** on servers with **35+ players**
+- Occurs during world map chunk unloading operations
+
+### Root Cause
+
+FastUtil's `LongOpenHashSet.iterator().remove()` can corrupt the iterator's internal state when the underlying hash set rehashes:
+
+1. Iterator is created over the set
+2. `remove()` is called which may trigger rehash
+3. Internal position tracking becomes invalid
+4. Next access throws NPE
+
+### HyFixes Bytecode Fix
+
+The early plugin wraps `unloadImages()` in a try-catch that catches `NullPointerException` and returns gracefully instead of crashing.
+
+---
+
+## 12. ArchetypeChunk Stale Entity Crash (CRITICAL)
+
+> **STATUS: FIXED** - HyFixes Early Plugin v1.6.1+ patches this via bytecode transformation
+
+### Summary
+
+Hytale's `ArchetypeChunk.getComponent()` throws `IndexOutOfBoundsException` when NPC systems try to access components from entities that have already been removed from the archetype chunk.
+
+### Error Pattern
+
+```
+java.lang.IndexOutOfBoundsException: Index out of range: 0
+    at com.hypixel.hytale.component.ArchetypeChunk.getComponent(ArchetypeChunk.java:159)
+    at com.hypixel.hytale.component.Store.__internal_getComponent(Store.java:1228)
+    at com.hypixel.hytale.component.CommandBuffer.getComponent(CommandBuffer.java:115)
+    at com.hypixel.hytale.server.npc.role.support.EntityList.add(EntityList.java:139)
+    at com.hypixel.hytale.server.npc.systems.PositionCacheSystems$UpdateSystem.addEntities(PositionCacheSystems.java:384)
+```
+
+### Frequency
+
+- Server crashes repeatedly during gameplay
+- Occurs when NPC/flock systems access stale entity references
+- More common on servers with many NPCs and active spawn beacons
+
+### Technical Analysis
+
+#### Root Cause
+
+Entity references become stale but aren't cleaned up before being accessed:
+
+1. Entity is added to position cache or entity list
+2. Entity is removed from its archetype chunk (despawned)
+3. NPC system still holds reference to the entity
+4. System tries to get component from removed entity
+5. `ArchetypeChunk.getComponent()` throws IndexOutOfBoundsException because chunk is empty
+
+#### Related Errors
+
+The crash is often preceded by:
+```
+[WARN] NPCEntity despawning due to lost marker: Ref{...}
+[SEVERE] Failed to run task!
+java.lang.IllegalArgumentException: Entity contains component type: StepComponent
+```
+
+### HyFixes Bytecode Fix
+
+The early plugin wraps `getComponent()` in a try-catch for `IndexOutOfBoundsException`:
+
+```java
+// Transformed method
+public Component getComponent(...) {
+    try {
+        // Original method body
+        return component;
+    } catch (IndexOutOfBoundsException e) {
+        System.out.println("[HyFixes-Early] WARNING: getComponent() IndexOutOfBounds - returning null");
+        return null;
+    }
+}
+```
+
+This prevents the crash and allows the calling code to handle null gracefully.
+
+### Related Issues
+
+- **GitHub Issue:** [#20](https://github.com/John-Willikers/hyfixes/issues/20)
+- **Reporter:** Weark
 
 ---
 

@@ -26,7 +26,24 @@ dependencies {
     compileOnly("com.google.code.findbugs:jsr305:3.0.2")
 }
 
+// Task to update manifest.json with current version
+tasks.register("updateManifestVersion") {
+    doLast {
+        val manifestFile = file("src/main/resources/manifest.json")
+        if (manifestFile.exists()) {
+            val content = manifestFile.readText()
+            val updated = content.replace(
+                Regex(""""Version":\s*"[^"]*""""),
+                """"Version": "${project.version}""""
+            )
+            manifestFile.writeText(updated)
+            println("Updated manifest.json to version ${project.version}")
+        }
+    }
+}
+
 tasks.jar {
+    dependsOn("updateManifestVersion")
     manifest {
         attributes(
             "Implementation-Title" to project.name,

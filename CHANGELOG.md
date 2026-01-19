@@ -2,9 +2,61 @@
 
 All notable changes to HyFixes will be documented in this file.
 
+## [1.6.2] - 2026-01-19
+
+### Fixed
+
+#### BetterMap Compatibility - ChunkUnloadManager Disable Option (Runtime Plugin)
+- **Issue:** BetterMap shows black/empty map when HyFixes is installed
+- **GitHub Issue:** [#21](https://github.com/John-Willikers/hyfixes/issues/21)
+- **Root Cause:** HyFixes' aggressive ChunkUnloadManager was unloading chunks every 30 seconds, destroying the chunk data that BetterMap needs to render the world map. The "ExplorationRadius" mentioned in the issue refers to BetterMap's map exploration feature which relies on chunk data being available.
+- **Fix:** Added environment variable to disable ChunkUnloadManager:
+  - Set `HYFIXES_DISABLE_CHUNK_UNLOAD=true` in your server environment
+  - Or add `-Dhyfixes.disableChunkUnload=true` to JVM args
+- **Impact:** BetterMap and other map plugins now work correctly when ChunkUnloadManager is disabled
+- **Trade-off:** Disabling ChunkUnloadManager means memory may grow on servers where players explore large areas (the original issue ChunkUnloadManager was designed to fix)
+
+---
+
+## [1.6.1] - 2026-01-19
+
+### Fixed
+
+#### ASM Upgrade for Java 25 Compatibility (Early Plugin)
+- **Issue:** HyFixes Early incompatible with plugins compiled for Java 25
+- **GitHub Issue:** [#19](https://github.com/John-Willikers/hyfixes/issues/19)
+- **Error:** `Unsupported class file major version 69` when loading Java 25 plugins
+- **Root Cause:** ASM 9.6 doesn't support Java 25 bytecode (class file version 69)
+- **Fix:** Upgraded ASM from 9.6 to **9.8** which adds full Java 25 support
+- **Impact:** HyFixes Early can now process bytecode from Java 25 compiled plugins
+
+#### ArchetypeChunk Stale Entity Reference Crash (Early Plugin)
+- **Target:** `ArchetypeChunk.getComponent()`
+- **Bug:** `IndexOutOfBoundsException: Index out of range: 0` in NPC position cache system
+- **GitHub Issue:** [#20](https://github.com/John-Willikers/hyfixes/issues/20)
+- **Error:** Server crashes when NPC systems access stale entity references
+- **Root Cause:** Entity references become stale (entity removed from chunk) but NPC systems still try to access components
+- **Fix:** Bytecode transformation wraps `getComponent()` in try-catch:
+  - Catches `IndexOutOfBoundsException` from stale entity access
+  - Returns null instead of crashing
+  - Logs warning for debugging
+- **Impact:** Prevents server crashes from stale NPC entity references
+
+---
+
 ## [1.6.0] - 2026-01-18
 
 ### Added
+
+#### WorldMapTracker Iterator Crash Fix (Early Plugin)
+- **Target:** `WorldMapTracker.unloadImages()`
+- **Bug:** `NullPointerException` during chunk unloading from FastUtil `LongOpenHashSet` iterator corruption
+- **GitHub Issue:** [#16](https://github.com/John-Willikers/hyfixes/issues/16)
+- **Root Cause:** FastUtil's `LongOpenHashSet.iterator().remove()` can corrupt internal state during rehash operations, causing NPE when iterating
+- **Fix:** Bytecode transformation wraps `unloadImages()` method in try-catch:
+  - Catches `NullPointerException` from iterator corruption
+  - Logs warning and returns gracefully instead of crashing
+- **Impact:** Prevents server crashes every ~30 minutes on high-population servers (35+ players)
 
 #### Teleporter Limit Fix - BlockCounter Null-Safe Decrement (Early Plugin)
 - **Target:** `TrackedPlacement$OnAddRemove.onEntityRemove()`

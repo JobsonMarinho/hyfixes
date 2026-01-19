@@ -8,3 +8,4 @@ com.hyfixes.early.SpawnMarkerEntityTransformer
 com.hyfixes.early.TrackedPlacementTransformer
 com.hyfixes.early.CommandBufferTransformer
 com.hyfixes.early.WorldMapTrackerTransformer
+com.hyfixes.early.ArchetypeChunkTransformer

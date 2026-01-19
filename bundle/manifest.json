@@ -1,7 +1,7 @@
 {
   "Group": "com.hyfixes",
   "Name": "HyFixes",
-  "Version": "1.1.0",
+  "Version": "1.6.0",
   "Description": "Essential bug fixes for Hytale Early Access servers. Includes runtime plugin and early plugin bytecode transformers. Prevents crashes, player kicks, combat desync, and sync issues.",
   "Authors": [
     {

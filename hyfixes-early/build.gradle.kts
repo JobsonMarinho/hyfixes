@@ -3,7 +3,7 @@ plugins {
 }
 
 group = "com.hyfixes"
-version = "1.0.0"
+version = findProperty("version")?.toString()?.trimStart('v') ?: "1.0.0"
 
 java {
     toolchain {
@@ -23,13 +23,30 @@ dependencies {
     // Use parent directory's libs folder (shared with runtime plugin)
     compileOnly(files("../libs/HytaleServer.jar"))
 
-    // ASM for bytecode manipulation
-    implementation("org.ow2.asm:asm:9.6")
-    implementation("org.ow2.asm:asm-commons:9.6")
-    implementation("org.ow2.asm:asm-util:9.6")
+    // ASM for bytecode manipulation (9.8+ required for Java 25 support)
+    implementation("org.ow2.asm:asm:9.8")
+    implementation("org.ow2.asm:asm-commons:9.8")
+    implementation("org.ow2.asm:asm-util:9.8")
+}
+
+// Task to update manifest.json with current version
+tasks.register("updateManifestVersion") {
+    doLast {
+        val manifestFile = file("src/main/resources/manifest.json")
+        if (manifestFile.exists()) {
+            val content = manifestFile.readText()
+            val updated = content.replace(
+                Regex(""""Version":\s*"[^"]*""""),
+                """"Version": "${project.version}""""
+            )
+            manifestFile.writeText(updated)
+            println("Updated early plugin manifest.json to version ${project.version}")
+        }
+    }
 }
 
 tasks.jar {
+    dependsOn("updateManifestVersion")
     manifest {
         attributes(
             "Implementation-Title" to "HyFixes Early Plugin",
