@@ -121,7 +121,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload to CurseForge
-        if: ${{ secrets.CURSEFORGE_TOKEN != '' && secrets.CURSEFORGE_PROJECT_ID != '' }}
+        continue-on-error: true
         uses: itsmeow/curseforge-upload@v3
         with:
           token: ${{ secrets.CURSEFORGE_TOKEN }}
