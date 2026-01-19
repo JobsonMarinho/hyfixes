@@ -4,9 +4,6 @@ on:
   push:
     tags: ['v*']
 
-env:
-  HYTALE_SERVER_URL: ${{ secrets.HYTALE_SERVER_URL }}
-
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -37,15 +34,13 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Download HytaleServer.jar
+      - name: Verify HytaleServer.jar exists
         run: |
-          mkdir -p libs
-          if [ -n "$HYTALE_SERVER_URL" ]; then
-            curl -L -o libs/HytaleServer.jar "$HYTALE_SERVER_URL"
-          else
-            echo "::error::HYTALE_SERVER_URL secret not set"
+          if [ ! -f libs/HytaleServer.jar ]; then
+            echo "::error::libs/HytaleServer.jar not found in repository!"
             exit 1
           fi
+          echo "Found HytaleServer.jar ($(du -h libs/HytaleServer.jar | cut -f1))"
 
       - name: Update manifest versions
         run: |
