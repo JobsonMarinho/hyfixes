@@ -1,6 +1,7 @@
 package com.hyfixes;
 
 import com.hyfixes.commands.ChunkProtectionCommand;
+import com.hyfixes.commands.DashboardCommand;
 import com.hyfixes.commands.ChunkStatusCommand;
 import com.hyfixes.commands.ChunkUnloadCommand;
 import com.hyfixes.commands.CleanInteractionsCommand;
@@ -218,7 +219,24 @@ public class HyFixes extends JavaPlugin {
             }
             chunkUnloadManager.start();
             getLogger().at(Level.INFO).log("[FIX] ChunkUnloadManager registered - aggressively unloads unused chunks");
-            getLogger().at(Level.INFO).log("[TIP] To disable for BetterMap compatibility, set chunkUnload.enabled=false in config.json");
+
+            // Enable Map-Aware Mode if configured (v1.8.0) - BetterMaps compatibility
+            if (config.isMapAwareModeEnabled()) {
+                try {
+                    World defaultWorld = Universe.get().getWorld("default");
+                    if (defaultWorld != null) {
+                        chunkUnloadManager.enableMapAwareMode(defaultWorld);
+                    } else {
+                        getLogger().at(Level.WARNING).log("[MapAware] Could not enable - default world not available yet");
+                        chunkUnloadManager.setMapAwareModeRequested(true);
+                        getLogger().at(Level.INFO).log("[MapAware] Map-Aware mode will try to initialize on first cleanup cycle");
+                    }
+                } catch (Exception e) {
+                    getLogger().at(Level.WARNING).log("[MapAware] Could not enable map-aware mode: " + e.getMessage());
+                }
+            } else {
+                getLogger().at(Level.INFO).log("[TIP] Enable mapAwareMode in config.json for BetterMap compatibility");
+            }
         }
 
         // Fix 7: GatherObjectiveTask null ref crash (v1.3.0)
@@ -311,6 +329,7 @@ public class HyFixes extends JavaPlugin {
     }
 
     private void registerCommands() {
+        getCommandRegistry().registerCommand(new DashboardCommand(this));
         getCommandRegistry().registerCommand(new ChunkProtectionCommand(this));
         getCommandRegistry().registerCommand(new ChunkStatusCommand(this));
         getCommandRegistry().registerCommand(new ChunkUnloadCommand(this));
@@ -319,7 +338,7 @@ public class HyFixes extends JavaPlugin {
         getCommandRegistry().registerCommand(new FixCounterCommand(this));
         getCommandRegistry().registerCommand(new InteractionStatusCommand(this));
         getCommandRegistry().registerCommand(new WhoCommand());
-        getLogger().at(Level.INFO).log("[CMD] Registered /chunkprotect, /chunkstatus, /chunkunload, /fixcounter, /interactionstatus, and /who commands");
+        getLogger().at(Level.INFO).log("[CMD] Registered /hyfixes dashboard, /chunkprotect, /chunkstatus, /chunkunload, /fixcounter, /interactionstatus, and /who commands");
     }
 
     @Override

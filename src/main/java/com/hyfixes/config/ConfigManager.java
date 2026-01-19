@@ -120,6 +120,32 @@ public class ConfigManager {
         }
     }
 
+
+    /**
+     * Save the current configuration to file.
+     * Used by the dashboard to persist config changes.
+     */
+    public void saveConfig() {
+        try {
+            Gson gson = new GsonBuilder()
+                    .setPrettyPrinting()
+                    .serializeNulls()
+                    .create();
+
+            String json = gson.toJson(config);
+
+            try (Writer writer = new BufferedWriter(new OutputStreamWriter(
+                    Files.newOutputStream(CONFIG_PATH), StandardCharsets.UTF_8))) {
+                writer.write(json);
+            }
+
+            System.out.println("[HyFixes-Config] Configuration saved to: " + CONFIG_PATH);
+        } catch (IOException e) {
+            System.err.println("[HyFixes-Config] Error saving config: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
     /**
      * Apply environment variable overrides for backwards compatibility.
      * ENV/JVM args take precedence over config file values.
@@ -269,6 +295,14 @@ public class ConfigManager {
 
     public int getChunkUnloadGcEveryNAttempts() {
         return config.chunkUnload.gcEveryNAttempts;
+    }
+
+    /**
+     * Check if map-aware mode is enabled for BetterMaps compatibility.
+     * When enabled, map images are pre-rendered before chunk unload.
+     */
+    public boolean isMapAwareModeEnabled() {
+        return config.chunkUnload.mapAwareMode;
     }
 
     // ============================================

@@ -52,6 +52,16 @@ public class HyFixesConfig {
         public int intervalSeconds = 30;
         public int initialDelaySeconds = 10;
         public int gcEveryNAttempts = 5;
+
+        /**
+         * Map-Aware Mode: Pre-renders map images before unloading chunks.
+         * This ensures BetterMaps and the vanilla map system have the data they need.
+         * When enabled, map images are generated for chunks before they're unloaded,
+         * preserving map data even after chunk memory is freed.
+         *
+         * Enable this if you're using BetterMaps or experiencing black/missing map areas.
+         */
+        public boolean mapAwareMode = false;
     }
 
     /**
@@ -165,5 +175,94 @@ public class HyFixesConfig {
      */
     public static class EarlyLoggingConfig {
         public boolean verbose = false;
+    }
+
+
+    // ============================================
+    // Convenience setter methods for dashboard UI
+    // ============================================
+
+    /**
+     * Set verbose logging.
+     */
+    public void setVerbose(boolean verbose) {
+        this.logging.verbose = verbose;
+    }
+
+    /**
+     * Check if verbose logging is enabled.
+     */
+    public boolean isVerbose() {
+        return this.logging.verbose;
+    }
+
+    /**
+     * Set chunk unload enabled.
+     */
+    public void setChunkUnloadEnabled(boolean enabled) {
+        this.chunkUnload.enabled = enabled;
+    }
+
+    /**
+     * Check if chunk unload is enabled.
+     */
+    public boolean isChunkUnloadEnabled() {
+        return this.chunkUnload.enabled;
+    }
+
+    /**
+     * Set chunk protection enabled.
+     */
+    public void setChunkProtectionEnabled(boolean enabled) {
+        this.chunkProtection.enabled = enabled;
+    }
+
+    /**
+     * Check if chunk protection is enabled.
+     */
+    public boolean isChunkProtectionEnabled() {
+        return this.chunkProtection.enabled;
+    }
+
+    /**
+     * Set map-aware mode enabled.
+     */
+    public void setMapAwareModeEnabled(boolean enabled) {
+        this.chunkUnload.mapAwareMode = enabled;
+    }
+
+    /**
+     * Check if map-aware mode is enabled.
+     */
+    public boolean isMapAwareModeEnabled() {
+        return this.chunkUnload.mapAwareMode;
+    }
+
+    /**
+     * Set sanitizer action logging.
+     */
+    public void setLogSanitizerActions(boolean enabled) {
+        this.logging.sanitizerActions = enabled;
+    }
+
+    /**
+     * Check if sanitizer action logging is enabled.
+     */
+    public boolean logSanitizerActions() {
+        return this.logging.sanitizerActions;
+    }
+
+    /**
+     * Set chunk protection event logging.
+     */
+    public void setLogChunkProtectionEvents(boolean enabled) {
+        this.chunkProtection.logProtectionEvents = enabled;
+    }
+
+    /**
+     * Check if chunk protection event logging is enabled.
+     */
+    public boolean logChunkProtectionEvents() {
+        return this.chunkProtection.logProtectionEvents;
     }
 }
