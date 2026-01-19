@@ -138,30 +138,41 @@ jobs:
         if: success()
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          CHANGELOG: ${{ steps.changelog.outputs.content }}
         run: |
           if [ -n "$DISCORD_WEBHOOK" ]; then
-            # Escape changelog for JSON
-            CHANGELOG_ESCAPED=$(echo '${{ steps.changelog.outputs.content }}' | head -c 500 | jq -Rs .)
+            # Truncate changelog if too long for Discord (max 4096 for embed description)
+            CHANGELOG_TRUNCATED=$(echo "$CHANGELOG" | head -c 1800)
+            if [ ${#CHANGELOG} -gt 1800 ]; then
+              CHANGELOG_TRUNCATED="${CHANGELOG_TRUNCATED}..."
+            fi
+
+            # Build JSON payload properly with jq
+            PAYLOAD=$(jq -n \
+              --arg title "HyFixes v${VERSION} Released!" \
+              --arg changelog "$CHANGELOG_TRUNCATED" \
+              --arg url "https://github.com/${{ github.repository }}/releases/tag/${TAG_VERSION}" \
+              '{
+                embeds: [{
+                  title: $title,
+                  description: $changelog,
+                  color: 5814783,
+                  fields: [
+                    {
+                      name: "Downloads",
+                      value: "[GitHub Release](\($url))",
+                      inline: false
+                    }
+                  ],
+                  footer: {
+                    text: "HyFixes - Bug fixes for Hytale servers"
+                  },
+                  url: $url
+                }]
+              }')
 
             curl -H "Content-Type: application/json" \
               -X POST \
-              -d "{
-                \"embeds\": [{
-                  \"title\": \"HyFixes v${VERSION} Released!\",
-                  \"description\": \"A new version of HyFixes is now available.\",
-                  \"color\": 5814783,
-                  \"fields\": [
-                    {
-                      \"name\": \"Downloads\",
-                      \"value\": \"[GitHub Release](https://github.com/${{ github.repository }}/releases/tag/${TAG_VERSION})\",
-                      \"inline\": false
-                    }
-                  ],
-                  \"footer\": {
-                    \"text\": \"HyFixes - Bug fixes for Hytale servers\"
-                  },
-                  \"url\": \"https://github.com/${{ github.repository }}/releases/tag/${TAG_VERSION}\"
-                }]
-              }" \
+              -d "$PAYLOAD" \
               "$DISCORD_WEBHOOK"
           fi
