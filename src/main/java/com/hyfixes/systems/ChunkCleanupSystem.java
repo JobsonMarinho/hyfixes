@@ -10,6 +10,8 @@ import com.hypixel.hytale.component.system.tick.EntityTickingSystem;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
+import com.hypixel.hytale.server.core.universe.world.World;
+
 import java.lang.reflect.Method;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -49,10 +51,18 @@ public class ChunkCleanupSystem extends EntityTickingSystem<EntityStore> {
     // NOTE: chunkStoreInstance/waitForLoadingChunks removed - causes "Store is currently processing!" errors
     private Object chunkLightingInstance = null;
     private Method invalidateLoadedChunksMethod = null;
+    
+    // Chunk protection system
+    private ChunkProtectionRegistry protectionRegistry = null;
+    private ChunkProtectionScanner protectionScanner = null;
+    private World cachedWorld = null;
+    private int protectionVerificationInterval;
+    private long lastProtectionScanTick = 0;
 
     public ChunkCleanupSystem(HyFixes plugin) {
         this.plugin = plugin;
         this.cleanupIntervalTicks = ConfigManager.getInstance().getChunkCleanupIntervalTicks();
+        this.protectionVerificationInterval = ConfigManager.getInstance().getChunkProtectionVerificationIntervalTicks();
     }
 
     @Override
@@ -102,6 +112,37 @@ public class ChunkCleanupSystem extends EntityTickingSystem<EntityStore> {
     private void runMainThreadCleanup() {
         cleanupCount.incrementAndGet();
         lastCleanupTime.set(System.currentTimeMillis());
+        
+        long currentTick = tickCounter.get();
+
+        // Run chunk protection scan before cleanup
+        if (ConfigManager.getInstance().isChunkProtectionEnabled() && 
+            protectionRegistry != null && protectionScanner != null && cachedWorld != null) {
+            
+            try {
+                // Scan for protected content
+                int newlyProtected = protectionScanner.scanWorld(cachedWorld, currentTick);
+                
+                // Periodically remove stale protections
+                if (currentTick - lastProtectionScanTick >= protectionVerificationInterval) {
+                    int staleRemoved = protectionRegistry.removeStaleProtections(
+                        currentTick, protectionVerificationInterval
+                    );
+                    lastProtectionScanTick = currentTick;
+                    
+                    if (ConfigManager.getInstance().logChunkProtectionEvents() && (newlyProtected > 0 || staleRemoved > 0)) {
+                        plugin.getLogger().at(Level.INFO).log(
+                            "[ChunkCleanupSystem] Protection scan: %d new, %d stale removed, %d total protected",
+                            newlyProtected, staleRemoved, protectionRegistry.getProtectedChunkCount()
+                        );
+                    }
+                }
+            } catch (Exception e) {
+                plugin.getLogger().at(Level.WARNING).log(
+                    "[ChunkCleanupSystem] Protection scan error: %s", e.getMessage()
+                );
+            }
+        }
 
         int successes = 0;
 
@@ -186,6 +227,27 @@ public class ChunkCleanupSystem extends EntityTickingSystem<EntityStore> {
             }
         }
     }
+    
+    /**
+     * Set the chunk protection registry and scanner.
+     * Called by HyFixes during initialization.
+     */
+    public void setChunkProtection(ChunkProtectionRegistry registry, ChunkProtectionScanner scanner) {
+        this.protectionRegistry = registry;
+        this.protectionScanner = scanner;
+        if (registry != null && scanner != null) {
+            plugin.getLogger().at(Level.INFO).log(
+                "[ChunkCleanupSystem] Chunk protection system registered"
+            );
+        }
+    }
+    
+    /**
+     * Set the world reference for protection scanning.
+     */
+    public void setWorld(World world) {
+        this.cachedWorld = world;
+    }
 
     /**
      * Get status for admin command.
@@ -196,6 +258,11 @@ public class ChunkCleanupSystem extends EntityTickingSystem<EntityStore> {
             ((System.currentTimeMillis() - lastRun) / 1000) + "s ago" :
             "never";
 
+        String protectionStatus = "disabled";
+        if (protectionRegistry != null) {
+            protectionStatus = protectionRegistry.getProtectedChunkCount() + " chunks protected";
+        }
+
         return String.format(
             "ChunkCleanupSystem Status (MAIN THREAD):\n" +
             "  ChunkLighting Ready: %s\n" +
@@ -203,13 +270,22 @@ public class ChunkCleanupSystem extends EntityTickingSystem<EntityStore> {
             "  Successful Calls: %d\n" +
             "  Instance World Skips: %d\n" +
             "  Last Cleanup: %s\n" +
-            "  Interval: %d seconds",
+            "  Interval: %d seconds\n" +
+            "  Chunk Protection: %s",
             chunkLightingInstance != null && invalidateLoadedChunksMethod != null,
             cleanupCount.get(),
             successCount.get(),
             threadErrorCount.get(),
             lastRunStr,
-            cleanupIntervalTicks / 20
+            cleanupIntervalTicks / 20,
+            protectionStatus
         );
+    }
+    
+    /**
+     * Get the chunk protection registry (for external access).
+     */
+    public ChunkProtectionRegistry getProtectionRegistry() {
+        return protectionRegistry;
     }
 }

@@ -67,6 +67,9 @@ public class ChunkUnloadManager {
 
     // Reference to the main-thread cleanup system
     private ChunkCleanupSystem chunkCleanupSystem = null;
+    
+    // Reference to chunk protection registry
+    private ChunkProtectionRegistry protectionRegistry = null;
 
     // Keywords that suggest cleanup/release functionality
     private static final String[] CLEANUP_KEYWORDS = {
@@ -126,6 +129,18 @@ public class ChunkUnloadManager {
         // "Store is currently processing!" errors when called from a system tick
         if (chunkLightingInstance != null) {
             chunkCleanupSystem.setChunkLightingInstance(chunkLightingInstance);
+        }
+    }
+    
+    /**
+     * Set the chunk protection registry for protected chunk awareness.
+     */
+    public void setProtectionRegistry(ChunkProtectionRegistry registry) {
+        this.protectionRegistry = registry;
+        if (registry != null) {
+            plugin.getLogger().at(Level.INFO).log(
+                "[ChunkUnloadManager] ChunkProtectionRegistry registered"
+            );
         }
     }
 
@@ -678,6 +693,11 @@ public class ChunkUnloadManager {
         String lastRunStr = lastRun > 0 ?
             ((System.currentTimeMillis() - lastRun) / 1000) + "s ago" :
             "never";
+            
+        String protectionStatus = "disabled";
+        if (protectionRegistry != null) {
+            protectionStatus = protectionRegistry.getProtectedChunkCount() + " chunks protected";
+        }
 
         return String.format(
             "ChunkUnloadManager Status (AGGRESSIVE v1.2.1):\n" +
@@ -687,14 +707,16 @@ public class ChunkUnloadManager {
             "  Cleanup Methods: %d\n" +
             "  Total Attempts: %d\n" +
             "  Methods Called: %d\n" +
-            "  Last Run: %s",
+            "  Last Run: %s\n" +
+            "  Chunk Protection: %s",
             apiDiscovered,
             chunkStoreInstance != null,
             chunkLightingInstance != null,
             cleanupMethods.size(),
             totalUnloadAttempts.get(),
             methodsCalled.get(),
-            lastRunStr
+            lastRunStr,
+            protectionStatus
         );
     }
 

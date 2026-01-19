@@ -280,6 +280,38 @@ public class ConfigManager {
     }
 
     // ============================================
+    // Chunk protection settings
+    // ============================================
+
+    public boolean isChunkProtectionEnabled() {
+        return config.chunkProtection.enabled;
+    }
+
+    public String[] getProtectedEntityKeywords() {
+        return config.chunkProtection.protectedEntityKeywords;
+    }
+
+    public String[] getProtectedBlockKeywords() {
+        return config.chunkProtection.protectedBlockKeywords;
+    }
+
+    public boolean protectGrowingPlants() {
+        return config.chunkProtection.protectGrowingPlants;
+    }
+
+    public boolean protectSpawnBeacons() {
+        return config.chunkProtection.protectSpawnBeacons;
+    }
+
+    public int getChunkProtectionVerificationIntervalTicks() {
+        return config.chunkProtection.verificationIntervalTicks;
+    }
+
+    public boolean logChunkProtectionEvents() {
+        return config.chunkProtection.logProtectionEvents;
+    }
+
+    // ============================================
     // Interaction manager settings
     // ============================================
 

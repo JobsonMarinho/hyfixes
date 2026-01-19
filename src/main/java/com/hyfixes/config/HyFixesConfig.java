@@ -14,6 +14,9 @@ public class HyFixesConfig {
     // Chunk cleanup settings
     public ChunkCleanupConfig chunkCleanup = new ChunkCleanupConfig();
     
+    // Chunk protection settings
+    public ChunkProtectionConfig chunkProtection = new ChunkProtectionConfig();
+    
     // Sanitizer toggles
     public SanitizersConfig sanitizers = new SanitizersConfig();
     
@@ -56,6 +59,19 @@ public class HyFixesConfig {
      */
     public static class ChunkCleanupConfig {
         public int intervalTicks = 600; // 30 seconds at 20 TPS
+    }
+
+    /**
+     * Chunk protection configuration - prevents cleanup of chunks containing important content
+     */
+    public static class ChunkProtectionConfig {
+        public boolean enabled = true;
+        public String[] protectedEntityKeywords = {"teleport", "portal", "warp", "interaction", "zone"};
+        public String[] protectedBlockKeywords = {"teleport", "portal", "warp", "spawner", "beacon"};
+        public boolean protectGrowingPlants = true;
+        public boolean protectSpawnBeacons = true;
+        public int verificationIntervalTicks = 12000; // 10 minutes at 20 TPS
+        public boolean logProtectionEvents = false;
     }
 
     /**

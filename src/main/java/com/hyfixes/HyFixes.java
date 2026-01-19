@@ -1,5 +1,6 @@
 package com.hyfixes;
 
+import com.hyfixes.commands.ChunkProtectionCommand;
 import com.hyfixes.commands.ChunkStatusCommand;
 import com.hyfixes.commands.ChunkUnloadCommand;
 import com.hyfixes.commands.CleanInteractionsCommand;
@@ -21,10 +22,14 @@ import com.hyfixes.listeners.SpawnBeaconSanitizer;
 import com.hyfixes.listeners.ChunkTrackerSanitizer;
 import com.hyfixes.listeners.InstanceTeleportSanitizer;
 import com.hyfixes.systems.ChunkCleanupSystem;
+import com.hyfixes.systems.ChunkProtectionRegistry;
+import com.hyfixes.systems.ChunkProtectionScanner;
 import com.hyfixes.systems.ChunkUnloadManager;
 import com.hyfixes.systems.InteractionChainMonitor;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
+import com.hypixel.hytale.server.core.universe.Universe;
+import com.hypixel.hytale.server.core.universe.world.World;
 
 import javax.annotation.Nonnull;
 import java.util.logging.Level;
@@ -58,6 +63,8 @@ public class HyFixes extends JavaPlugin {
     private InstancePositionTracker instancePositionTracker;
     private ChunkUnloadManager chunkUnloadManager;
     private ChunkCleanupSystem chunkCleanupSystem;
+    private ChunkProtectionRegistry chunkProtectionRegistry;
+    private ChunkProtectionScanner chunkProtectionScanner;
     private GatherObjectiveTaskSanitizer gatherObjectiveTaskSanitizer;
     private PickupItemChunkHandler pickupItemChunkHandler;
     private InteractionChainMonitor interactionChainMonitor;
@@ -159,9 +166,36 @@ public class HyFixes extends JavaPlugin {
             chunkCleanupSystem = new ChunkCleanupSystem(this);
             getEntityStoreRegistry().registerSystem(chunkCleanupSystem);
             getLogger().at(Level.INFO).log("[FIX] ChunkCleanupSystem registered - runs cleanup on main thread");
+            
+            // Fix 6c: Chunk protection system (v1.4.2)
+            // Prevents cleanup of chunks containing teleporters, portals, and other important content
+            if (config.isChunkProtectionEnabled()) {
+                chunkProtectionRegistry = new ChunkProtectionRegistry(this);
+                chunkProtectionScanner = new ChunkProtectionScanner(this, chunkProtectionRegistry);
+                
+                // Wire up protection to cleanup system
+                chunkCleanupSystem.setChunkProtection(chunkProtectionRegistry, chunkProtectionScanner);
+                
+                // Try to get world reference for scanning
+                try {
+                    World world = Universe.get().getWorld("default");
+                    if (world != null) {
+                        chunkCleanupSystem.setWorld(world);
+                    }
+                } catch (Exception e) {
+                    getLogger().at(Level.INFO).log("[PROT] World not available yet - will be set later");
+                }
+                
+                getLogger().at(Level.INFO).log("[PROT] ChunkProtectionSystem registered - protects teleporters and portals from cleanup");
+            } else {
+                getLogger().at(Level.INFO).log("[DISABLED] ChunkProtectionSystem - disabled via config");
+            }
 
             // Wire up the systems
             chunkUnloadManager.setChunkCleanupSystem(chunkCleanupSystem);
+            if (chunkProtectionRegistry != null) {
+                chunkUnloadManager.setProtectionRegistry(chunkProtectionRegistry);
+            }
             chunkUnloadManager.start();
             getLogger().at(Level.INFO).log("[FIX] ChunkUnloadManager registered - aggressively unloads unused chunks");
             getLogger().at(Level.INFO).log("[TIP] To disable for BetterMap compatibility, set chunkUnload.enabled=false in config.json");
@@ -257,6 +291,7 @@ public class HyFixes extends JavaPlugin {
     }
 
     private void registerCommands() {
+        getCommandRegistry().registerCommand(new ChunkProtectionCommand(this));
         getCommandRegistry().registerCommand(new ChunkStatusCommand(this));
         getCommandRegistry().registerCommand(new ChunkUnloadCommand(this));
         getCommandRegistry().registerCommand(new CleanInteractionsCommand(this));
@@ -264,7 +299,7 @@ public class HyFixes extends JavaPlugin {
         getCommandRegistry().registerCommand(new FixCounterCommand(this));
         getCommandRegistry().registerCommand(new InteractionStatusCommand(this));
         getCommandRegistry().registerCommand(new WhoCommand());
-        getLogger().at(Level.INFO).log("[CMD] Registered /chunkstatus, /chunkunload, /fixcounter, /interactionstatus, and /who commands");
+        getLogger().at(Level.INFO).log("[CMD] Registered /chunkprotect, /chunkstatus, /chunkunload, /fixcounter, /interactionstatus, and /who commands");
     }
 
     @Override
@@ -366,5 +401,19 @@ public class HyFixes extends JavaPlugin {
      */
     public InstanceTeleportSanitizer getInstanceTeleportSanitizer() {
         return instanceTeleportSanitizer;
+    }
+    
+    /**
+     * Get the ChunkProtectionRegistry for commands and status.
+     */
+    public ChunkProtectionRegistry getChunkProtectionRegistry() {
+        return chunkProtectionRegistry;
+    }
+    
+    /**
+     * Get the ChunkProtectionScanner for commands and status.
+     */
+    public ChunkProtectionScanner getChunkProtectionScanner() {
+        return chunkProtectionScanner;
     }
 }
