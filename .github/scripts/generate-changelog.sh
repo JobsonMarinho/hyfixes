@@ -24,25 +24,47 @@ if [ -z "$COMMITS" ]; then
   exit 0
 fi
 
-# Check if API key is set
-if [ -z "$OPENROUTER_API_KEY" ]; then
-  echo "Warning: OPENROUTER_API_KEY not set, using commit list as changelog" >&2
+# Fallback function - format commits as changelog
+fallback_changelog() {
   echo "## Changes"
   echo ""
   echo "$COMMITS" | while read -r line; do
-    echo "- ${line#* }"  # Remove commit hash prefix
+    # Remove commit hash prefix (first word)
+    echo "- ${line#* }"
   done
+}
+
+# Check if API key is set
+if [ -z "$OPENROUTER_API_KEY" ]; then
+  echo "Warning: OPENROUTER_API_KEY not set, using commit list as changelog" >&2
+  fallback_changelog
   exit 0
 fi
 
 # Default model if not specified
 MODEL="${OPENROUTER_MODEL:-anthropic/claude-sonnet-4}"
 
-# Escape commits for JSON (handle newlines, quotes, backslashes)
-COMMITS_ESCAPED=$(echo "$COMMITS" | jq -Rs .)
+# Create a temporary file for the JSON payload
+PAYLOAD_FILE=$(mktemp)
+trap "rm -f $PAYLOAD_FILE" EXIT
 
 # Build the prompt
-PROMPT="Generate a changelog for a Hytale server plugin release called HyFixes. Format as markdown with sections for Features, Fixes, and Changes as needed. Be concise and user-friendly. Focus on what changed, not commit hashes. If there are no commits in a category, omit that section. Here are the commits since last release:\n\n${COMMITS_ESCAPED}"
+PROMPT="Generate a changelog for a Hytale server plugin release called HyFixes. Format as markdown with sections for Features, Fixes, and Changes as needed. Be concise and user-friendly. Focus on what changed, not commit hashes. If there are no commits in a category, omit that section. Here are the commits since last release:
+
+$COMMITS"
+
+# Use jq to properly construct the JSON payload
+jq -n \
+  --arg model "$MODEL" \
+  --arg prompt "$PROMPT" \
+  '{
+    model: $model,
+    max_tokens: 1024,
+    messages: [{
+      role: "user",
+      content: $prompt
+    }]
+  }' > "$PAYLOAD_FILE"
 
 # Call OpenRouter API (OpenAI-compatible format)
 RESPONSE=$(curl -s https://openrouter.ai/api/v1/chat/completions \
@@ -50,14 +72,7 @@ RESPONSE=$(curl -s https://openrouter.ai/api/v1/chat/completions \
   -H "HTTP-Referer: https://github.com/John-Willikers/hyfixes" \
   -H "X-Title: HyFixes Release Changelog" \
   -H "Content-Type: application/json" \
-  -d "{
-    \"model\": \"$MODEL\",
-    \"max_tokens\": 1024,
-    \"messages\": [{
-      \"role\": \"user\",
-      \"content\": \"$PROMPT\"
-    }]
-  }")
+  -d @"$PAYLOAD_FILE")
 
 # Extract the text content from the response (OpenAI format)
 CHANGELOG=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // empty')
@@ -69,12 +84,10 @@ if [ -z "$CHANGELOG" ]; then
   ERROR=$(echo "$RESPONSE" | jq -r '.error.message // empty')
   if [ -n "$ERROR" ]; then
     echo "API Error: $ERROR" >&2
+  else
+    echo "Raw response: $RESPONSE" >&2
   fi
-  echo "## Changes"
-  echo ""
-  echo "$COMMITS" | while read -r line; do
-    echo "- ${line#* }"  # Remove commit hash prefix
-  done
+  fallback_changelog
   exit 0
 fi
 

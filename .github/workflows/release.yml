@@ -120,18 +120,19 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload to CurseForge
-        continue-on-error: true
-        uses: itsmeow/curseforge-upload@v3
-        with:
-          token: ${{ secrets.CURSEFORGE_TOKEN }}
-          project_id: ${{ secrets.CURSEFORGE_PROJECT_ID }}
-          game_endpoint: hytale
-          file_path: dist/hyfixes-bundle-v${{ env.VERSION }}.zip
-          display_name: "HyFixes v${{ env.VERSION }}"
-          changelog: ${{ steps.changelog.outputs.content }}
-          changelog_type: markdown
-          release_type: release
+      # CurseForge upload - disabled until Hytale is available on CurseForge
+      # - name: Upload to CurseForge
+      #   continue-on-error: true
+      #   uses: itsmeow/curseforge-upload@v3
+      #   with:
+      #     token: ${{ secrets.CURSEFORGE_TOKEN }}
+      #     project_id: ${{ secrets.CURSEFORGE_PROJECT_ID }}
+      #     game_endpoint: hytale
+      #     file_path: dist/hyfixes-bundle-v${{ env.VERSION }}.zip
+      #     display_name: "HyFixes v${{ env.VERSION }}"
+      #     changelog: ${{ steps.changelog.outputs.content }}
+      #     changelog_type: markdown
+      #     release_type: release
 
       - name: Send Discord notification
         if: success()
