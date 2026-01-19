@@ -1,6 +1,6 @@
 #!/bin/bash
-# Generate changelog from commits using Claude API
-# Requires: ANTHROPIC_API_KEY environment variable
+# Generate changelog from commits using OpenRouter API
+# Requires: OPENROUTER_API_KEY and OPENROUTER_MODEL environment variables
 
 set -e
 
@@ -9,7 +9,7 @@ LAST_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
 
 # Get commits since last tag, or all commits if no previous tag
 if [ -z "$LAST_TAG" ]; then
-  echo "No previous tag found, using all commits" >&2
+  echo "No previous tag found, using recent commits" >&2
   COMMITS=$(git log --oneline --no-merges -50)
 else
   echo "Getting commits since $LAST_TAG" >&2
@@ -24,40 +24,52 @@ if [ -z "$COMMITS" ]; then
   exit 0
 fi
 
-# Escape commits for JSON (handle newlines, quotes, backslashes)
-COMMITS_ESCAPED=$(echo "$COMMITS" | jq -Rs .)
-
 # Check if API key is set
-if [ -z "$ANTHROPIC_API_KEY" ]; then
-  echo "Warning: ANTHROPIC_API_KEY not set, using commit list as changelog" >&2
+if [ -z "$OPENROUTER_API_KEY" ]; then
+  echo "Warning: OPENROUTER_API_KEY not set, using commit list as changelog" >&2
   echo "## Changes"
   echo ""
   echo "$COMMITS" | while read -r line; do
-    echo "- $line"
+    echo "- ${line#* }"  # Remove commit hash prefix
   done
   exit 0
 fi
 
-# Call Claude API to generate changelog
-RESPONSE=$(curl -s https://api.anthropic.com/v1/messages \
-  -H "x-api-key: $ANTHROPIC_API_KEY" \
-  -H "anthropic-version: 2023-06-01" \
-  -H "content-type: application/json" \
+# Default model if not specified
+MODEL="${OPENROUTER_MODEL:-anthropic/claude-sonnet-4}"
+
+# Escape commits for JSON (handle newlines, quotes, backslashes)
+COMMITS_ESCAPED=$(echo "$COMMITS" | jq -Rs .)
+
+# Build the prompt
+PROMPT="Generate a changelog for a Hytale server plugin release called HyFixes. Format as markdown with sections for Features, Fixes, and Changes as needed. Be concise and user-friendly. Focus on what changed, not commit hashes. If there are no commits in a category, omit that section. Here are the commits since last release:\n\n${COMMITS_ESCAPED}"
+
+# Call OpenRouter API (OpenAI-compatible format)
+RESPONSE=$(curl -s https://openrouter.ai/api/v1/chat/completions \
+  -H "Authorization: Bearer $OPENROUTER_API_KEY" \
+  -H "HTTP-Referer: https://github.com/John-Willikers/hyfixes" \
+  -H "X-Title: HyFixes Release Changelog" \
+  -H "Content-Type: application/json" \
   -d "{
-    \"model\": \"claude-sonnet-4-20250514\",
+    \"model\": \"$MODEL\",
     \"max_tokens\": 1024,
     \"messages\": [{
       \"role\": \"user\",
-      \"content\": \"Generate a changelog for a Hytale server plugin release called HyFixes. Format as markdown with sections for Features, Fixes, and Changes as needed. Be concise and user-friendly. Focus on what changed, not commit hashes. If there are no commits in a category, omit that section. Here are the commits since last release:\\n\\n${COMMITS_ESCAPED}\"
+      \"content\": \"$PROMPT\"
     }]
   }")
 
-# Extract the text content from the response
-CHANGELOG=$(echo "$RESPONSE" | jq -r '.content[0].text // empty')
+# Extract the text content from the response (OpenAI format)
+CHANGELOG=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // empty')
 
 # Check if we got a valid response
 if [ -z "$CHANGELOG" ]; then
   echo "Warning: Failed to generate changelog from API, using fallback" >&2
+  # Check for error message
+  ERROR=$(echo "$RESPONSE" | jq -r '.error.message // empty')
+  if [ -n "$ERROR" ]; then
+    echo "API Error: $ERROR" >&2
+  fi
   echo "## Changes"
   echo ""
   echo "$COMMITS" | while read -r line; do

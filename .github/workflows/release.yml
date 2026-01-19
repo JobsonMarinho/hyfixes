@@ -66,10 +66,11 @@ jobs:
       - name: Build Early Plugin
         run: ./gradlew :hyfixes-early:build -Pversion=${{ env.TAG_VERSION }}
 
-      - name: Generate changelog with Claude
+      - name: Generate changelog with LLM
         id: changelog
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_MODEL: ${{ secrets.OPENROUTER_MODEL }}
         run: |
           chmod +x .github/scripts/generate-changelog.sh
           CHANGELOG=$(.github/scripts/generate-changelog.sh)
