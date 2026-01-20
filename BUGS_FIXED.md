@@ -989,3 +989,38 @@ reloads it from disk after a 2-second delay.
 - Full logging of all recovery attempts
 
 **Config:** `sanitizers.defaultWorldRecovery` (default: `true`)
+
+---
+
+## Fix 22: UUIDSystem Null Check During Chunk Unload (v1.9.5)
+
+**Bug:** Server crashes with NPE when removing entities during chunk unload because `uuidComponent` is null.
+
+**Stack trace:**
+```
+java.lang.NullPointerException: Cannot invoke "UUIDComponent.getUuid()" because "uuidComponent" is null
+    at EntityStore$UUIDSystem.onEntityRemove(EntityStore.java:201)
+    at ChunkUnloadingSystem.lambda$tryUnload$1(ChunkUnloadingSystem.java:141)
+```
+
+**Root cause:** Vanilla Hytale bug. During chunk unload, entities can be removed before their UUIDComponent is fully initialized. The `onEntityRemove` method assumes the component is never null.
+
+**Fix:** ASM bytecode transformer (`UUIDSystemTransformer`) injects a null check before the `uuidComponent.getUuid()` call:
+- If null: logs warning and returns early (safe no-op)
+- If not null: continues with normal UUID cleanup
+
+**Configuration:**
+```json
+{
+  "transformers": {
+    "uuidSystem": true
+  }
+}
+```
+
+**Files:**
+- `UUIDSystemTransformer.java` - Main transformer
+- `UUIDSystemVisitor.java` - Class visitor for onEntityRemove
+- `UUIDRemoveMethodVisitor.java` - Null check injection
+
+**GitHub Issue:** [#28](https://github.com/John-Willikers/hyfixes/issues/28)
