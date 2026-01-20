@@ -19,12 +19,17 @@ public class UUIDSystemTransformer implements ClassTransformer {
     private static final String TARGET_CLASS = "com.hypixel.hytale.server.entity.EntityStore$UUIDSystem";
 
     @Override
-    public String targetClass() {
-        return TARGET_CLASS;
+    public int priority() {
+        return 100;
     }
 
     @Override
-    public byte[] transform(byte[] classBytes) {
+    public byte[] transform(String className, String packageName, byte[] classBytes) {
+        // Only transform the target class
+        if (!className.equals(TARGET_CLASS)) {
+            return classBytes;
+        }
+
         // Check if transformer is enabled
         if (!EarlyConfigManager.getInstance().isTransformerEnabled("uuidSystem")) {
             System.out.println("[HyFixes-Early] UUIDSystemTransformer is disabled, skipping");
