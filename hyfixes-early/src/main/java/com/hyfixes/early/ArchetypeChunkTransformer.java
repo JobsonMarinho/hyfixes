@@ -56,6 +56,7 @@ public class ArchetypeChunkTransformer implements ClassTransformer {
         System.out.println("[HyFixes-Early] ================================================");
         System.out.println("[HyFixes-Early] Transforming ArchetypeChunk class...");
         System.out.println("[HyFixes-Early] Fixing getComponent() IndexOutOfBoundsException (Issue #20)");
+        System.out.println("[HyFixes-Early] Fixing copySerializableEntity() IndexOutOfBoundsException (Issue #29)");
         System.out.println("[HyFixes-Early] ================================================");
 
         try {
