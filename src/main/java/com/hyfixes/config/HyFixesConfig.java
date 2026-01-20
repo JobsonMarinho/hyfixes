@@ -44,6 +44,9 @@ public class HyFixesConfig {
     // Early plugin logging
     public EarlyConfig early = new EarlyConfig();
 
+    // Interaction timeout settings (for early plugin)
+    public InteractionTimeoutConfig interactionTimeout = new InteractionTimeoutConfig();
+
     /**
      * Chunk unload configuration
      */
@@ -154,6 +157,7 @@ public class HyFixesConfig {
         public boolean commandBuffer = true;
         public boolean worldMapTracker = true;
         public boolean archetypeChunk = true;
+        public boolean interactionTimeout = true;
     }
 
     /**
@@ -176,6 +180,18 @@ public class HyFixesConfig {
      */
     public static class EarlyLoggingConfig {
         public boolean verbose = false;
+    }
+
+    /**
+     * Interaction timeout configuration
+     * Controls how long the server waits for client responses during interactions
+     */
+    public static class InteractionTimeoutConfig {
+        /** Base timeout in milliseconds (added to ping-based calculation) */
+        public long baseTimeoutMs = 6000;
+
+        /** Multiplier applied to average ping */
+        public double pingMultiplier = 3.0;
     }
 
 

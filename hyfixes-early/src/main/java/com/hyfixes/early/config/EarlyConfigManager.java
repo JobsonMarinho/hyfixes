@@ -164,7 +164,7 @@ public class EarlyConfigManager {
     }
 
     // ============================================
-    // InteractionChain transformer settings
+    // Interaction timeout transformer settings
     // ============================================
 
     public EarlyPluginConfig.InteractionTimeoutConfig getInteractionTimeoutConfig() {
