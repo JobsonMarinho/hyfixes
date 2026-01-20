@@ -823,6 +823,103 @@ The bytecode transformation:
 
 ---
 
+### 21. Interaction Timeout Configuration (Hatchet/Tree Bug) (v1.9.5-early)
+
+**Severity:** High - Kicks players with unstable connections during interactions
+
+**GitHub Issue:** https://github.com/John-Willikers/hyfixes/issues/25
+
+**The Bug:**
+
+Players get kicked from the server when they experience network lag during block-breaking interactions (most commonly noticed when chopping trees with a hatchet).
+
+Hytale's `PacketHandler.getOperationTimeoutThreshold()` uses hardcoded timeout values that are too aggressive for players with unstable connections:
+
+```java
+// Original buggy code
+public long getOperationTimeoutThreshold() {
+    double average = this.getPingInfo(PongType.Tick).getPingMetricSet().getAverage(0);
+    return PingInfo.TIME_UNIT.toMillis(Math.round(average * 2.0)) + 3000L;
+}
+```
+
+**Formula:** `(average_ping × 2.0) + 3000ms`
+
+| Player Ping | Timeout |
+|-------------|---------|
+| 50ms | 3100ms |
+| 100ms | 3200ms |
+| 200ms | 3400ms |
+| 500ms | 4000ms |
+
+When this timeout is exceeded, `InteractionManager.serverTick()` throws a RuntimeException. The exception handler in `TickInteractionManagerSystem.tick()` catches ANY Throwable and removes the entity (kicks the player).
+
+**Root Cause:**
+
+The timeout calculation doesn't account for:
+- Network jitter and packet loss
+- Temporary lag spikes during gameplay
+- Players on unstable connections (WiFi, mobile, satellite)
+
+**Impact:**
+
+- Players on unstable connections get randomly kicked during block-breaking
+- Most noticeable when using hatchets on trees (longer interactions)
+- Creates frustrating gameplay experience for affected players
+
+**The Fix (Early Plugin):**
+
+`PacketHandlerTransformer` transforms `getOperationTimeoutThreshold()` to use configurable values:
+
+```java
+// Fixed - configurable timeout values
+public long getOperationTimeoutThreshold() {
+    double average = this.getPingInfo(PongType.Tick).getPingMetricSet().getAverage(0);
+    return PingInfo.TIME_UNIT.toMillis(Math.round(average * pingMultiplier)) + baseTimeoutMs;
+}
+```
+
+**New Formula:** `(average_ping × pingMultiplier) + baseTimeoutMs`
+
+**Default Config (more lenient):**
+- `baseTimeoutMs`: 6000 (was 3000)
+- `pingMultiplier`: 3.0 (was 2.0)
+
+| Player Ping | Old Timeout | New Timeout |
+|-------------|-------------|-------------|
+| 50ms | 3100ms | 6150ms |
+| 100ms | 3200ms | 6300ms |
+| 200ms | 3400ms | 6600ms |
+| 500ms | 4000ms | 7500ms |
+
+This gives players approximately 2x more time to respond without causing any client/server desync.
+
+**Configuration:**
+
+Server admins can tune these values in `mods/hyfixes/config.json`:
+
+```json
+{
+  "interactionTimeout": {
+    "baseTimeoutMs": 6000,
+    "pingMultiplier": 3.0
+  },
+  "transformers": {
+    "interactionTimeout": true
+  }
+}
+```
+
+**Why Not Cancel Interaction Chains?**
+
+We considered cancelling the interaction chain on timeout instead of kicking the player. However, this would cause client/server desync - the client thinks the action succeeded, but the server cancelled it. The configurable timeout approach is safer because:
+
+1. No desync - player still completes the action, just has more time
+2. Server admins can tune for their player base
+3. No gameplay behavior change, just more tolerance
+
+---
+
 ## Technical Reference
 
 ### Runtime Plugin Systems
@@ -859,6 +956,7 @@ The bytecode transformation:
 | SpawnMarkerEntityTransformer | `SpawnMarkerEntity` | `<init>` (constructor) | Field initialization for `npcReferences` (ROOT CAUSE FIX) |
 | TrackedPlacementTransformer | `TrackedPlacement$OnAddRemove` | `onEntityRemove` | Full method replacement with null-safe version |
 | WorldMapTrackerTransformer | `WorldMapTracker` | `unloadImages` | Try-catch wrapper for FastUtil iterator corruption |
+| PacketHandlerTransformer | `PacketHandler` | `getOperationTimeoutThreshold` | Full method replacement with configurable timeout values |
 
 ---
 
