@@ -5,31 +5,25 @@ import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
 /**
- * ASM MethodVisitor that transforms BlockComponentChunk.addEntityReference()
- * to handle duplicate block components gracefully instead of throwing.
+ * ASM MethodVisitor that removes the PlayerUtil.broadcastMessageToPlayers call
+ * from PlayerSystems$PlayerRemovedSystem.onEntityRemoved().
  *
- * The original code throws when a duplicate is detected:
- *   throw new IllegalArgumentException("Duplicate block components at: " + position);
+ * We detect and remove the call by watching for:
+ * 1. String constant "server.general.playerLeftWorld" (in LDC or INVOKEDYNAMIC)
+ * 2. The subsequent INVOKESTATIC to PlayerUtil.broadcastMessageToPlayers
  *
- * The transformed code logs a warning and returns:
- *   System.out.println("[HyFixes-Early] WARNING: Duplicate block components, ignoring");
- *   return;
- *
- * We detect the pattern by watching for:
- * 1. LDC "Duplicate block components" (or string starting with it)
- * 2. Or INVOKEDYNAMIC makeConcatWithConstants with that pattern
- * Then replace the subsequent ATHROW with POP + warning + RETURN
+ * The entire call chain leading up to and including the INVOKESTATIC is removed.
  */
-public class AddEntityReferenceMethodVisitor extends MethodVisitor {
+public class PlayerRemovedMethodVisitor extends MethodVisitor {
 
     private final String className;
     private final MethodVisitor target;
 
-    // State tracking
-    private boolean sawDuplicateBlockComponentsString = false;
-    private boolean sawNewIllegalArgumentException = false;
+    // State tracking for detecting the broadcast call
+    private boolean inBroadcastCall = false;
+    private int stackDepth = 0;
 
-    public AddEntityReferenceMethodVisitor(MethodVisitor mv, String className) {
+    public PlayerRemovedMethodVisitor(MethodVisitor mv, String className) {
         super(Opcodes.ASM9, null);
         this.target = mv;
         this.className = className;
@@ -41,80 +35,71 @@ public class AddEntityReferenceMethodVisitor extends MethodVisitor {
     }
 
     @Override
-    public void visitTypeInsn(int opcode, String type) {
-        // Detect NEW IllegalArgumentException
-        if (opcode == Opcodes.NEW && type.equals("java/lang/IllegalArgumentException")) {
-            sawNewIllegalArgumentException = true;
-        }
-        target.visitTypeInsn(opcode, type);
-    }
-
-    @Override
     public void visitLdcInsn(Object value) {
-        // Detect the "Duplicate block components" string
+        // Detect the "server.general.playerLeftWorld" string - start of broadcast call
         if (value instanceof String str) {
-            if (str.contains("Duplicate block components")) {
-                sawDuplicateBlockComponentsString = true;
-                System.out.println("[HyFixes-Early] Found 'Duplicate block components' exception pattern");
+            if (str.equals("server.general.playerLeftWorld")) {
+                inBroadcastCall = true;
+                stackDepth = 0;
+                System.out.println("[HyFixes-Early] Detected 'server.general.playerLeftWorld' - removing broadcast call");
+                return; // Don't emit this LDC
             }
         }
+
+        // If we're in a broadcast call, track but don't emit
+        if (inBroadcastCall) {
+            return;
+        }
+
         target.visitLdcInsn(value);
     }
 
     @Override
-    public void visitInvokeDynamicInsn(String name, String descriptor, org.objectweb.asm.Handle bootstrapMethodHandle, Object... bootstrapMethodArguments) {
-        // Check for string concatenation that includes "Duplicate block components"
-        if (name.equals("makeConcatWithConstants")) {
-            for (Object arg : bootstrapMethodArguments) {
-                if (arg instanceof String && ((String) arg).contains("Duplicate block components")) {
-                    sawDuplicateBlockComponentsString = true;
-                    System.out.println("[HyFixes-Early] Found 'Duplicate block components' in string concat");
-                    break;
-                }
+    public void visitMethodInsn(int opcode, String owner, String name, String descriptor, boolean isInterface) {
+        // Check if this is the PlayerUtil.broadcastMessageToPlayers call
+        if (inBroadcastCall && opcode == Opcodes.INVOKESTATIC) {
+            if (owner.endsWith("PlayerUtil") && name.equals("broadcastMessageToPlayers")) {
+                // End of the broadcast call - reset state and skip this call
+                System.out.println("[HyFixes-Early] Removed PlayerUtil.broadcastMessageToPlayers call");
+                inBroadcastCall = false;
+                stackDepth = 0;
+                return; // Don't emit the INVOKESTATIC
             }
         }
-        target.visitInvokeDynamicInsn(name, descriptor, bootstrapMethodHandle, bootstrapMethodArguments);
-    }
 
-    @Override
-    public void visitInsn(int opcode) {
-        // Check if this is the ATHROW after the duplicate block components check
-        if (opcode == Opcodes.ATHROW && sawDuplicateBlockComponentsString) {
-            // Replace the throw with: POP (remove exception), log warning, return
-            target.visitInsn(Opcodes.POP); // Remove the exception from stack
-
-            // Log warning
-            target.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;");
-            target.visitLdcInsn("[HyFixes-Early] WARNING: Duplicate block component detected - ignoring (teleporter fix)");
-            target.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false);
-
-            // Return instead of throwing (method returns void)
-            target.visitInsn(Opcodes.RETURN);
-
-            // Reset state
-            sawDuplicateBlockComponentsString = false;
-            sawNewIllegalArgumentException = false;
-
-            System.out.println("[HyFixes-Early] Replaced ATHROW with warning + return");
-            return; // Don't emit the original ATHROW
+        // If we're building up the broadcast call, don't emit intermediate method calls
+        if (inBroadcastCall) {
+            return;
         }
 
-        target.visitInsn(opcode);
-    }
-
-    @Override
-    public void visitMethodInsn(int opcode, String owner, String name, String descriptor, boolean isInterface) {
         target.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
     }
 
     @Override
     public void visitFieldInsn(int opcode, String owner, String name, String descriptor) {
+        // If we're in a broadcast call, skip field access
+        if (inBroadcastCall) {
+            return;
+        }
         target.visitFieldInsn(opcode, owner, name, descriptor);
     }
 
     @Override
     public void visitVarInsn(int opcode, int var) {
+        // If we're in a broadcast call, skip variable loads
+        if (inBroadcastCall) {
+            return;
+        }
         target.visitVarInsn(opcode, var);
+    }
+
+    @Override
+    public void visitInsn(int opcode) {
+        // If we're in a broadcast call, skip instructions
+        if (inBroadcastCall) {
+            return;
+        }
+        target.visitInsn(opcode);
     }
 
     @Override
@@ -134,11 +119,46 @@ public class AddEntityReferenceMethodVisitor extends MethodVisitor {
 
     @Override
     public void visitIntInsn(int opcode, int operand) {
+        if (inBroadcastCall) {
+            return;
+        }
         target.visitIntInsn(opcode, operand);
     }
 
     @Override
+    public void visitTypeInsn(int opcode, String type) {
+        if (inBroadcastCall) {
+            return;
+        }
+        target.visitTypeInsn(opcode, type);
+    }
+
+    @Override
+    public void visitInvokeDynamicInsn(String name, String descriptor, org.objectweb.asm.Handle bootstrapMethodHandle, Object... bootstrapMethodArguments) {
+        // Check for string concatenation that includes "server.general.playerLeftWorld"
+        if (name.equals("makeConcatWithConstants")) {
+            for (Object arg : bootstrapMethodArguments) {
+                if (arg instanceof String && ((String) arg).contains("server.general.playerLeftWorld")) {
+                    inBroadcastCall = true;
+                    stackDepth = 0;
+                    System.out.println("[HyFixes-Early] Detected 'server.general.playerLeftWorld' in string concat");
+                    return; // Don't emit
+                }
+            }
+        }
+
+        if (inBroadcastCall) {
+            return;
+        }
+
+        target.visitInvokeDynamicInsn(name, descriptor, bootstrapMethodHandle, bootstrapMethodArguments);
+    }
+
+    @Override
     public void visitIincInsn(int var, int increment) {
+        if (inBroadcastCall) {
+            return;
+        }
         target.visitIincInsn(var, increment);
     }
 
@@ -154,6 +174,9 @@ public class AddEntityReferenceMethodVisitor extends MethodVisitor {
 
     @Override
     public void visitMultiANewArrayInsn(String descriptor, int numDimensions) {
+        if (inBroadcastCall) {
+            return;
+        }
         target.visitMultiANewArrayInsn(descriptor, numDimensions);
     }
 
@@ -174,8 +197,7 @@ public class AddEntityReferenceMethodVisitor extends MethodVisitor {
 
     @Override
     public void visitMaxs(int maxStack, int maxLocals) {
-        // Increase max stack for our println call
-        target.visitMaxs(maxStack + 2, maxLocals);
+        target.visitMaxs(maxStack, maxLocals);
     }
 
     @Override

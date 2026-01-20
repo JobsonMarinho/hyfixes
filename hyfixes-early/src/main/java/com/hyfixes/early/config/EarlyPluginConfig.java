@@ -39,6 +39,7 @@ public class EarlyPluginConfig {
         public boolean uuidSystem = true;
         public boolean tickingThread = true;
         public boolean universeRemovePlayer = true;
+        public boolean playerSystems = true;
     }
 
     /**

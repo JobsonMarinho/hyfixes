@@ -13,3 +13,4 @@ com.hyfixes.early.PacketHandlerTransformer
 com.hyfixes.early.UUIDSystemTransformer
 com.hyfixes.early.TickingThreadTransformer
 com.hyfixes.early.UniverseTransformer
+com.hyfixes.early.PlayerSystemsTransformer
