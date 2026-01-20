@@ -160,6 +160,7 @@ public class HyFixesConfig {
         public boolean interactionTimeout = true;
         public boolean uuidSystem = true;
         public boolean tickingThread = true;
+        public boolean universeRemovePlayer = true;
     }
 
     /**

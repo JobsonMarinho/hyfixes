@@ -139,6 +139,7 @@ public class EarlyConfigManager {
             case "interactiontimeout" -> t.interactionTimeout;
             case "uuidsystem" -> t.uuidSystem;
             case "tickingthread" -> t.tickingThread;
+            case "universeremoveplayer" -> t.universeRemovePlayer;
             default -> {
                 System.err.println("[HyFixes-Early-Config] Unknown transformer: " + name);
                 yield true; // Default to enabled for safety
