@@ -16,7 +16,7 @@ import org.objectweb.asm.ClassWriter;
  */
 public class UUIDSystemTransformer implements ClassTransformer {
 
-    private static final String TARGET_CLASS = "com.hypixel.hytale.server.entity.EntityStore$UUIDSystem";
+    private static final String TARGET_CLASS = "com.hypixel.hytale.server.core.universe.world.storage.EntityStore$UUIDSystem";
 
     @Override
     public int priority() {
