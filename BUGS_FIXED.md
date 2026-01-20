@@ -1024,3 +1024,35 @@ java.lang.NullPointerException: Cannot invoke "UUIDComponent.getUuid()" because 
 - `UUIDRemoveMethodVisitor.java` - Null check injection
 
 **GitHub Issue:** [#28](https://github.com/John-Willikers/hyfixes/issues/28)
+
+---
+
+## Fix 23: ArchetypeChunk.copySerializableEntity IndexOutOfBounds (v1.9.5)
+
+**Bug:** Server crashes with IndexOutOfBoundsException when serializing entity during chunk saving.
+
+**Stack trace:**
+```
+java.lang.IndexOutOfBoundsException: Index out of range: 11
+    at com.hypixel.hytale.component.ArchetypeChunk.copySerializableEntity(ArchetypeChunk.java:243)
+    at com.hypixel.hytale.component.Store.copySerializableEntity(Store.java:789)
+    at com.hypixel.hytale.server.core.universe.world.storage.component.ChunkSavingSystems$Ticking.tick(ChunkSavingSystems.java:172)
+```
+
+**Root cause:** Vanilla Hytale bug. During chunk saving, entity archetype or component data can change while serialization is in progress, causing invalid component index access.
+
+**Fix:** Extended existing `ArchetypeChunkTransformer` to also wrap `copySerializableEntity()` with try-catch for IndexOutOfBoundsException. On exception, logs warning and returns null (skips serializing that entity component - safe degradation).
+
+**Configuration:** Uses existing `archetypeChunk` toggle:
+```json
+{
+  "transformers": {
+    "archetypeChunk": true
+  }
+}
+```
+
+**Files:**
+- `ArchetypeChunkVisitor.java` - Added CopySerializableEntityMethodVisitor
+
+**GitHub Issue:** [#29](https://github.com/John-Willikers/hyfixes/issues/29)
