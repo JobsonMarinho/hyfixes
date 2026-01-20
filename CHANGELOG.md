@@ -2,6 +2,22 @@
 
 All notable changes to HyFixes will be documented in this file.
 
+## [1.9.7] - 2026-01-20
+
+### Fixed
+- **PacketHandler transformer**: Corrected class paths for PongType (now in protocol.packets.connection), PingInfo (inner class), and HistoricMetric (renamed from PingMetricSet)
+- **UUIDSystem transformer**: Fixed package path (server.core.universe.world.storage) and method descriptor for onEntityRemove()
+- **UUIDRemoveMethodVisitor**: Fixed UUIDComponent class path (server.core.entity)
+
+### Technical Details
+- PongType: `com/hypixel/hytale/protocol/packets/connection/PongType`
+- PingInfo: `com/hypixel/hytale/server/core/io/PacketHandler$PingInfo`
+- HistoricMetric: `com/hypixel/hytale/metrics/metric/HistoricMetric`
+- UUIDSystem: `com.hypixel.hytale.server.core.universe.world.storage.EntityStore$UUIDSystem`
+- UUIDComponent: `com/hypixel/hytale/server/core/entity/UUIDComponent`
+
+---
+
 ## [1.9.6] - 2026-01-20
 
 ### Added
