@@ -867,3 +867,27 @@ The bytecode transformation:
 - [README.md](README.md) - Plugin overview and installation
 - [HYTALE_CORE_BUGS.md](HYTALE_CORE_BUGS.md) - Bugs that cannot be fixed (requires Hytale developers)
 - [CHANGELOG.md](CHANGELOG.md) - Version history
+
+---
+
+## Fix 16: Default World Recovery (v1.4.3)
+
+**Issue:** [#23](https://github.com/John-Willikers/hyfixes/issues/23)
+
+**Problem:** When any plugin causes an exception in the world thread, Hytale removes
+the world via `removeWorldExceptionally()`. The default world is never recreated,
+leaving all players unable to join until server restart with error:
+"no default world configured"
+
+**Solution:** `DefaultWorldRecoverySanitizer` listens for `RemoveWorldEvent` with
+`RemovalReason.EXCEPTIONAL`. When the default world is removed, it automatically
+reloads it from disk after a 2-second delay.
+
+**Safety Features:**
+- 2 second delay before reload (allows crash cleanup to complete)
+- 30 second cooldown between recovery attempts
+- Maximum 5 recovery attempts before requiring manual restart
+- Only recovers the configured default world (not instance worlds)
+- Full logging of all recovery attempts
+
+**Config:** `sanitizers.defaultWorldRecovery` (default: `true`)
