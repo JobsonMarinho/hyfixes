@@ -28,11 +28,19 @@ public class UniverseVisitor extends ClassVisitor {
         MethodVisitor mv = super.visitMethod(access, name, descriptor, signature, exceptions);
 
         // Look for lambda methods in removePlayer - they're named lambda$removePlayer$N
+        // We ONLY want the lambda that has PlayerRef as a parameter - that's the whenComplete
+        // handler that can perform fallback cleanup. Other lambdas don't have access to PlayerRef.
         if (name.startsWith("lambda$removePlayer$")) {
             System.out.println("[HyFixes-Early] Found lambda method: " + className + "." + name + descriptor);
-            System.out.println("[HyFixes-Early] Wrapping with fallback cleanup try-catch...");
-            transformed = true;
-            return new RemovePlayerLambdaVisitor(mv, className, name);
+
+            // Only transform if descriptor contains PlayerRef - that's the lambda we can clean up with
+            if (descriptor.contains("PlayerRef")) {
+                System.out.println("[HyFixes-Early] Lambda has PlayerRef parameter - applying fallback cleanup transform");
+                transformed = true;
+                return new RemovePlayerLambdaVisitor(mv, className, name, descriptor, access);
+            } else {
+                System.out.println("[HyFixes-Early] Lambda doesn't have PlayerRef - skipping");
+            }
         }
 
         return mv;

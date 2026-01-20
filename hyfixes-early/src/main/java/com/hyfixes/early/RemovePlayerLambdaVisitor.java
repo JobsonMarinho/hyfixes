@@ -14,6 +14,8 @@ public class RemovePlayerLambdaVisitor extends MethodVisitor {
 
     private final String className;
     private final String methodName;
+    private final String descriptor;
+    private final int playerRefSlot;
 
     private final Label tryStart = new Label();
     private final Label tryEnd = new Label();
@@ -22,10 +24,58 @@ public class RemovePlayerLambdaVisitor extends MethodVisitor {
 
     private boolean started = false;
 
-    public RemovePlayerLambdaVisitor(MethodVisitor methodVisitor, String className, String methodName) {
+    public RemovePlayerLambdaVisitor(MethodVisitor methodVisitor, String className, String methodName, String descriptor, int access) {
         super(Opcodes.ASM9, methodVisitor);
         this.className = className;
         this.methodName = methodName;
+        this.descriptor = descriptor;
+        // Find which slot has PlayerRef - parse descriptor
+        // For instance methods, slot 0 is 'this', so we need to offset by 1
+        boolean isStatic = (access & Opcodes.ACC_STATIC) != 0;
+        int baseSlot = isStatic ? 0 : 1;  // Instance methods have 'this' in slot 0
+        this.playerRefSlot = baseSlot + findPlayerRefParamIndex(descriptor);
+        System.out.println("[HyFixes-Early] Method is " + (isStatic ? "static" : "instance") + ", PlayerRef is in slot " + playerRefSlot);
+    }
+
+    /**
+     * Find the parameter index (0-based) of PlayerRef by parsing the descriptor.
+     * This returns the index in the parameter list, not the JVM slot.
+     */
+    private int findPlayerRefParamIndex(String desc) {
+        // Descriptor format: (Lcom/.../PlayerRef;Ljava/lang/Void;...)V
+        int slot = 0;
+        int i = 1; // Skip opening '('
+        while (i < desc.length() && desc.charAt(i) != ')') {
+            if (desc.charAt(i) == 'L') {
+                // Object type - find the semicolon
+                int end = desc.indexOf(';', i);
+                String type = desc.substring(i + 1, end);
+                if (type.endsWith("PlayerRef")) {
+                    return slot;
+                }
+                i = end + 1;
+                slot++;
+            } else if (desc.charAt(i) == '[') {
+                // Array - skip to element type
+                i++;
+                if (desc.charAt(i) == 'L') {
+                    i = desc.indexOf(';', i) + 1;
+                } else {
+                    i++;
+                }
+                slot++;
+            } else {
+                // Primitive type (Z, B, C, S, I, F, J, D)
+                if (desc.charAt(i) == 'J' || desc.charAt(i) == 'D') {
+                    slot += 2; // long and double take 2 slots
+                } else {
+                    slot++;
+                }
+                i++;
+            }
+        }
+        // Default to slot 0 if not found
+        return 0;
     }
 
     @Override
@@ -63,9 +113,8 @@ public class RemovePlayerLambdaVisitor extends MethodVisitor {
 
             mv.visitLabel(cleanupTryStart);
 
-            // Load playerRef from slot 1 (captured lambda parameter)
-            // Lambda signature is typically (PlayerRef)V or similar
-            mv.visitVarInsn(Opcodes.ALOAD, 1);
+            // Load playerRef from dynamically determined slot
+            mv.visitVarInsn(Opcodes.ALOAD, playerRefSlot);
 
             // Call playerRef.getChunkTracker()
             mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL,

@@ -2,6 +2,14 @@
 
 All notable changes to HyFixes will be documented in this file.
 
+## [1.9.6] - 2026-01-20
+
+### Fixed
+- **Critical:** Fixed VerifyError crash introduced in v1.9.5 where UniverseVisitor was transforming the wrong lambda method
+  - Bug: All `lambda$removePlayer$N` methods were being transformed, but only one has `PlayerRef` parameter
+  - The `lambda$removePlayer$1` variant has `(CompletableFuture, Void, Throwable)` signature - transforming it caused bytecode verification failure
+  - Fix: UniverseVisitor now only transforms lambdas with `PlayerRef` in descriptor, and dynamically finds the correct parameter slot
+
 ## [1.9.5] - 2026-01-20
 
 ### Added
