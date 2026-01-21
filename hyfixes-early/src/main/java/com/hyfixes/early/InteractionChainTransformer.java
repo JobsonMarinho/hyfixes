@@ -52,6 +52,7 @@ public class InteractionChainTransformer implements ClassTransformer {
         System.out.println("[HyFixes-Early] ================================================");
         System.out.println("[HyFixes-Early] Transforming InteractionChain class...");
         System.out.println("[HyFixes-Early] Fixing putInteractionSyncData() buffer overflow bug");
+        System.out.println("[HyFixes-Early] Fixing removeInteractionEntry() out-of-order bug (Issue #40)");
         System.out.println("[HyFixes-Early] ================================================");
 
         try {

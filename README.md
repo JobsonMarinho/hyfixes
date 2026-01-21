@@ -2,7 +2,7 @@
 
 Essential bug fixes for Hytale Early Access servers. Prevents crashes, player kicks, and desync issues caused by known bugs in Hytale's core systems.
 
-[![Discord](https://img.shields.io/badge/Discord-Join%20for%20Support-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/r6KzU4n7V8)
+[![Discord](https://img.shields.io/badge/Discord-Join%20for%20Support-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/6g7McTd27z)
 [![GitHub Issues](https://img.shields.io/badge/GitHub-Report%20Bugs-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/John-Willikers/hyfixes/issues)
 
 ---
@@ -38,6 +38,12 @@ Some Hytale bugs occur in code paths that cannot be intercepted at runtime. The 
    - Set `ACCEPT_EARLY_PLUGINS=1` environment variable, OR
    - Press Enter when prompted at startup
 
+### Alternative Downloads
+
+**ModTale:**
+- [HyFixes Runtime](https://modtale.net/project/YOUR_RUNTIME_UUID) *(update link after project creation)*
+- [HyFixes Early](https://modtale.net/project/YOUR_EARLY_UUID) *(update link after project creation)*
+
 ---
 
 ## What Gets Fixed
@@ -70,6 +76,12 @@ Some Hytale bugs occur in code paths that cannot be intercepted at runtime. The 
 | Null npcReferences (Constructor) | Critical | ROOT CAUSE: SpawnMarkerEntity never initializes array |
 | BlockCounter Not Decrementing | Medium | Teleporter limit stuck at 5, can't place new ones |
 | WorldMapTracker Iterator Crash | Critical | Server crashes every ~30 min on high-pop servers |
+| ArchetypeChunk Stale Entity | Critical | IndexOutOfBoundsException when NPC systems access removed entities |
+| Operation Timeout | Critical | Player kicked from network packet timeouts |
+| Null UUID on Entity Remove | Critical | Crash when removing entities with null UUIDs |
+| Universe Player Remove | Critical | Crash when removing players from universe |
+| TickingThread Stop | Medium | Server shutdown issues causing hangs |
+| CommandBuffer Component Access | Critical | Crash when accessing components through command buffers |
 
 ---
 
@@ -196,34 +208,24 @@ Look for these log messages at startup:
 
 ### Early Plugin Loaded
 
-Look for these log messages at startup (10 transformers):
+Look for these log messages at startup (15 transformers):
 ```
-[HyFixes-Early] Transforming InteractionChain class...
 [HyFixes-Early] InteractionChain transformation COMPLETE!
-
-[HyFixes-Early] Transforming World class...
 [HyFixes-Early] World transformation COMPLETE!
-
-[HyFixes-Early] Transforming SpawnReferenceSystems$BeaconAddRemoveSystem...
+[HyFixes-Early] Universe transformation COMPLETE!
+[HyFixes-Early] TickingThread transformation COMPLETE!
 [HyFixes-Early] SpawnReferenceSystems transformation COMPLETE!
-
-[HyFixes-Early] Transforming BeaconSpawnController...
 [HyFixes-Early] BeaconSpawnController transformation COMPLETE!
-
-[HyFixes-Early] Transforming BlockComponentChunk...
 [HyFixes-Early] BlockComponentChunk transformation COMPLETE!
-
-[HyFixes-Early] Transforming SpawnReferenceSystems$MarkerAddRemoveSystem...
 [HyFixes-Early] MarkerAddRemoveSystem transformation COMPLETE!
-
-[HyFixes-Early] Transforming SpawnMarkerEntity...
 [HyFixes-Early] SpawnMarkerEntity transformation COMPLETE!
-
-[HyFixes-Early] Transforming TrackedPlacement$OnAddRemove...
+[HyFixes-Early] SpawnMarkerSystems transformation COMPLETE!
 [HyFixes-Early] TrackedPlacement transformation COMPLETE!
-
-[HyFixes-Early] Transforming WorldMapTracker...
 [HyFixes-Early] WorldMapTracker transformation COMPLETE!
+[HyFixes-Early] ArchetypeChunk transformation COMPLETE!
+[HyFixes-Early] PacketHandler transformation COMPLETE!
+[HyFixes-Early] Successfully transformed UUIDSystem.onEntityRemove()
+[HyFixes-Early] CommandBuffer transformation COMPLETE!
 ```
 
 ---
@@ -245,7 +247,7 @@ Look for these log messages at startup (10 transformers):
 - Steps to reproduce (if known)
 - HyFixes version
 
-**Need help?** Join our [Discord](https://discord.gg/r6KzU4n7V8) for community support!
+**Need help?** Join our [Discord](https://discord.gg/6g7McTd27z) for community support!
 
 ---
 
@@ -296,4 +298,4 @@ Found another Hytale bug that needs patching? We'd love your help!
 2. Fork the repo and create a fix
 3. Submit a PR with your changes
 
-Join our [Discord](https://discord.gg/r6KzU4n7V8) to discuss ideas!
+Join our [Discord](https://discord.gg/6g7McTd27z) to discuss ideas!

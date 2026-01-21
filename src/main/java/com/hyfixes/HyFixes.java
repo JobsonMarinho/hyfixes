@@ -10,6 +10,7 @@ import com.hyfixes.commands.FixCounterCommand;
 import com.hyfixes.commands.InteractionStatusCommand;
 import com.hyfixes.commands.WhoCommand;
 import com.hyfixes.config.ConfigManager;
+import com.hyfixes.data.BedChunkDatabase;
 import com.hyfixes.listeners.CraftingManagerSanitizer;
 import com.hyfixes.listeners.EmptyArchetypeSanitizer;
 import com.hyfixes.listeners.InteractionManagerSanitizer;
@@ -80,6 +81,7 @@ public class HyFixes extends JavaPlugin {
     private DefaultWorldRecoverySanitizer defaultWorldRecoverySanitizer;
     private TeleporterProtectionListener teleporterProtectionListener;
     private RespawnBlockProtectionListener respawnBlockProtectionListener;
+    private BedChunkDatabase bedChunkDatabase;
 
     public HyFixes(@Nonnull JavaPluginInit init) {
         super(init);
@@ -205,10 +207,17 @@ public class HyFixes extends JavaPlugin {
                     getLogger().at(Level.WARNING).log("[PROT] TeleporterProtectionListener not initialized - teleporter events won't be monitored");
                 }
 
-                // Register bed/respawn block listener for chunk protection
-                respawnBlockProtectionListener = new RespawnBlockProtectionListener(this, chunkProtectionRegistry);
-                getChunkStoreRegistry().registerSystem(respawnBlockProtectionListener);
-                getLogger().at(Level.INFO).log("[PROT] RespawnBlockProtectionListener registered - auto-protects bed/spawn point chunks");
+                // Register bed/respawn block listener for chunk protection (Issue #44)
+                // Initialize SQLite database for bed chunk storage
+                bedChunkDatabase = new BedChunkDatabase(this);
+                if (bedChunkDatabase.initialize()) {
+                    respawnBlockProtectionListener = new RespawnBlockProtectionListener(this, chunkProtectionRegistry, bedChunkDatabase);
+                    getChunkStoreRegistry().registerSystem(respawnBlockProtectionListener);
+                    respawnBlockProtectionListener.startSyncTask(); // Start periodic online player sync
+                    getLogger().at(Level.INFO).log("[PROT] RespawnBlockProtectionListener registered - SQLite + online-only bed protection (Issue #44)");
+                } else {
+                    getLogger().at(Level.WARNING).log("[PROT] Failed to initialize BedChunkDatabase - bed protection disabled");
+                }
 
             } else {
                 getLogger().at(Level.INFO).log("[DISABLED] ChunkProtectionSystem - disabled via config");
@@ -365,6 +374,15 @@ public class HyFixes extends JavaPlugin {
         if (chunkUnloadManager != null) {
             chunkUnloadManager.stop();
         }
+
+        // Stop bed protection sync task and close database
+        if (respawnBlockProtectionListener != null) {
+            respawnBlockProtectionListener.stopSyncTask();
+        }
+        if (bedChunkDatabase != null) {
+            bedChunkDatabase.close();
+        }
+
         getLogger().at(Level.INFO).log("HyFixes has been disabled.");
     }
 

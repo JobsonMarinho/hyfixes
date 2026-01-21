@@ -6,7 +6,7 @@ Essential bug fixes for Hytale Early Access servers. Prevents crashes and player
 
 **Need help?** Join our Discord for community support!
 
-**Discord:** https://discord.gg/r6KzU4n7V8
+**Discord:** https://discord.gg/6g7McTd27z
 
 **Found a bug?** Report it on GitHub:
 
@@ -64,6 +64,12 @@ Fixes deep networking bugs that cause combat/interaction desync.
 - **Null npcReferences (Constructor)** - ROOT CAUSE FIX: Initializes array in SpawnMarkerEntity constructor
 - **BlockCounter Not Decrementing** - Fixes teleporter limit stuck at 5
 - **WorldMapTracker Iterator Crash** - Fixes server crashes every ~30 min on high-pop servers
+- **ArchetypeChunk Stale Entity** - Fixes IndexOutOfBoundsException when accessing removed entities
+- **Operation Timeout** - Fixes player kicks from network packet timeouts
+- **Null UUID on Entity Remove** - Fixes crash when removing entities with null UUIDs
+- **Universe Player Remove** - Fixes crash when removing players from universe
+- **TickingThread Stop** - Fixes graceful server shutdown issues
+- **CommandBuffer Component Access** - Fixes crash when accessing components through command buffers
 
 ---
 
@@ -81,35 +87,25 @@ Look for these messages in your server log at startup:
 
 ### Early Plugin
 
-Look for these messages in your server log at startup (10 transformers):
+Look for these messages in your server log at startup (15 transformers):
 
 ```
-[HyFixes-Early] Transforming InteractionChain class...
 [HyFixes-Early] InteractionChain transformation COMPLETE!
-
-[HyFixes-Early] Transforming World class...
 [HyFixes-Early] World transformation COMPLETE!
-
-[HyFixes-Early] Transforming SpawnReferenceSystems$BeaconAddRemoveSystem...
+[HyFixes-Early] Universe transformation COMPLETE!
+[HyFixes-Early] TickingThread transformation COMPLETE!
 [HyFixes-Early] SpawnReferenceSystems transformation COMPLETE!
-
-[HyFixes-Early] Transforming BeaconSpawnController...
 [HyFixes-Early] BeaconSpawnController transformation COMPLETE!
-
-[HyFixes-Early] Transforming BlockComponentChunk...
 [HyFixes-Early] BlockComponentChunk transformation COMPLETE!
-
-[HyFixes-Early] Transforming SpawnReferenceSystems$MarkerAddRemoveSystem...
 [HyFixes-Early] MarkerAddRemoveSystem transformation COMPLETE!
-
-[HyFixes-Early] Transforming SpawnMarkerEntity...
 [HyFixes-Early] SpawnMarkerEntity transformation COMPLETE!
-
-[HyFixes-Early] Transforming TrackedPlacement$OnAddRemove...
+[HyFixes-Early] SpawnMarkerSystems transformation COMPLETE!
 [HyFixes-Early] TrackedPlacement transformation COMPLETE!
-
-[HyFixes-Early] Transforming WorldMapTracker...
 [HyFixes-Early] WorldMapTracker transformation COMPLETE!
+[HyFixes-Early] ArchetypeChunk transformation COMPLETE!
+[HyFixes-Early] PacketHandler transformation COMPLETE!
+[HyFixes-Early] Successfully transformed UUIDSystem.onEntityRemove()
+[HyFixes-Early] CommandBuffer transformation COMPLETE!
 ```
 
 ---
@@ -183,4 +179,4 @@ For detailed technical documentation, source code, and contribution guidelines:
 - Join our Discord community
 - Share HyFixes with other server admins!
 
-**Discord:** https://discord.gg/r6KzU4n7V8
+**Discord:** https://discord.gg/6g7McTd27z

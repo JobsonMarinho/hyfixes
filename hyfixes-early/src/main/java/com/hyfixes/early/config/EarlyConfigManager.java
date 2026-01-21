@@ -126,6 +126,7 @@ public class EarlyConfigManager {
         EarlyPluginConfig.TransformersConfig t = config.transformers;
         return switch (name.toLowerCase()) {
             case "interactionchain" -> t.interactionChain;
+            case "interactionmanager" -> t.interactionManager;
             case "world" -> t.world;
             case "spawnreferencesystems" -> t.spawnReferenceSystems;
             case "beaconspawncontroller" -> t.beaconSpawnController;
@@ -140,6 +141,7 @@ public class EarlyConfigManager {
             case "uuidsystem" -> t.uuidSystem;
             case "tickingthread" -> t.tickingThread;
             case "universeremoveplayer" -> t.universeRemovePlayer;
+            case "livingentity" -> t.livingEntity;
             default -> {
                 System.err.println("[HyFixes-Early-Config] Unknown transformer: " + name);
                 yield true; // Default to enabled for safety

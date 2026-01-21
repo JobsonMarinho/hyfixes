@@ -10,11 +10,13 @@ import org.objectweb.asm.Opcodes;
  * This visitor intercepts problematic methods and applies fixes:
  * 1. putInteractionSyncData - buffer overflow when data arrives out of order
  * 2. updateSyncPosition - throws IllegalArgumentException on sync gaps
+ * 3. removeInteractionEntry - throws IllegalArgumentException on out-of-order removal (Issue #40)
  */
 public class InteractionChainVisitor extends ClassVisitor {
 
     private static final String PUT_SYNC_DATA_METHOD = "putInteractionSyncData";
     private static final String UPDATE_SYNC_POSITION_METHOD = "updateSyncPosition";
+    private static final String REMOVE_INTERACTION_ENTRY_METHOD = "removeInteractionEntry";
 
     private String className;
 
@@ -42,6 +44,12 @@ public class InteractionChainVisitor extends ClassVisitor {
             System.out.println("[HyFixes-Early] Found method: " + name + descriptor);
             System.out.println("[HyFixes-Early] Applying sync position fix...");
             return new UpdateSyncPositionMethodVisitor(mv, className);
+        }
+
+        if (name.equals(REMOVE_INTERACTION_ENTRY_METHOD)) {
+            System.out.println("[HyFixes-Early] Found method: " + name + descriptor);
+            System.out.println("[HyFixes-Early] Applying remove out-of-order fix (Issue #40)...");
+            return new RemoveInteractionEntryMethodVisitor(mv, className);
         }
 
         return mv;

@@ -25,6 +25,7 @@ public class EarlyPluginConfig {
      */
     public static class TransformersConfig {
         public boolean interactionChain = true;
+        public boolean interactionManager = true;
         public boolean world = true;
         public boolean spawnReferenceSystems = true;
         public boolean beaconSpawnController = true;
@@ -39,6 +40,7 @@ public class EarlyPluginConfig {
         public boolean uuidSystem = true;
         public boolean tickingThread = true;
         public boolean universeRemovePlayer = true;
+        public boolean livingEntity = true;
     }
 
     /**
