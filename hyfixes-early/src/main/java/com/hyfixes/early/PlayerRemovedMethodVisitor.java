@@ -104,16 +104,28 @@ public class PlayerRemovedMethodVisitor extends MethodVisitor {
 
     @Override
     public void visitJumpInsn(int opcode, Label label) {
+        // If we're in a broadcast call, skip jump instructions
+        if (inBroadcastCall) {
+            return;
+        }
         target.visitJumpInsn(opcode, label);
     }
 
     @Override
     public void visitLabel(Label label) {
+        // If we're in a broadcast call, skip labels associated with removed code
+        if (inBroadcastCall) {
+            return;
+        }
         target.visitLabel(label);
     }
 
     @Override
     public void visitFrame(int type, int numLocal, Object[] local, int numStack, Object[] stack) {
+        // If we're in a broadcast call, skip stack frame entries for removed code
+        if (inBroadcastCall) {
+            return;
+        }
         target.visitFrame(type, numLocal, local, numStack, stack);
     }
 
