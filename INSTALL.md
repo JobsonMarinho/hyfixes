@@ -75,12 +75,18 @@ Fixes deep core bugs via bytecode transformation:
 - Null npcReferences (spawn marker crash - ROOT CAUSE FIX)
 - BlockCounter not decrementing (teleporter limit stuck)
 - WorldMapTracker iterator crash (30-min crash on high-pop servers)
+- ArchetypeChunk stale entity (NPC system IndexOutOfBoundsException)
+- Operation timeout (network packet timeout kicks)
+- Null UUID on entity remove (crash on entity removal)
+- Universe player remove (crash when removing players)
+- TickingThread stop (server shutdown issues)
+- CommandBuffer component access (crash accessing components)
 
 ---
 
 ## Support
 
-**Discord:** https://discord.gg/r6KzU4n7V8
+**Discord:** https://discord.gg/6g7McTd27z
 
 **GitHub:** https://github.com/John-Willikers/hyfixes
 

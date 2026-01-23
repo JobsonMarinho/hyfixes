@@ -8,7 +8,7 @@ Each bug includes:
 - Reproduction steps (where known)
 - Suggested fixes for Hytale developers
 
-**Last Updated:** 2026-01-19
+**Last Updated:** 2026-01-21
 **Hytale Version:** Early Access (2025+)
 **Analysis Tool:** HyFixes Plugin Development
 
@@ -27,10 +27,15 @@ Each bug includes:
 8. [WorldMapTracker Iterator Crash](#11-worldmaptracker-iterator-crash-critical) - **FIXED**
 9. [ArchetypeChunk Stale Entity Crash](#12-archetypechunk-stale-entity-crash-critical) - **FIXED**
 
+### In Progress (HyFixes v1.10.0)
+14. [InteractionChain Remove Out of Order](#14-interactionchain-remove-out-of-order-medium) - **PLANNED**
+15. [InteractionManager Client Timeout](#15-interactionmanager-client-timeout-medium) - **PLANNED**
+
 ### Requires Hytale Developers
 2. [Missing Replacement Interactions](#2-missing-replacement-interactions-medium)
 3. [Client/Server Interaction Desync](#3-clientserver-interaction-desync-medium)
 4. [World Task Queue Silent NPE](#4-world-task-queue-silent-npe-low)
+13. [Client Fade Callback Race Condition](#13-client-fade-callback-race-condition-critical) - **CLIENT BUG**
 
 ---
 
@@ -680,6 +685,327 @@ This prevents the crash and allows the calling code to handle null gracefully.
 
 - **GitHub Issue:** [#20](https://github.com/John-Willikers/hyfixes/issues/20)
 - **Reporter:** Weark
+
+---
+
+## 13. Client Fade Callback Race Condition (CRITICAL)
+
+> **STATUS: CLIENT BUG** - Cannot be fixed server-side. Requires Hytale client patch. Server-side mitigation may be possible.
+
+### Summary
+
+The Hytale client crashes when it receives a second `JoinWorldPacket` while still processing the fade animation from a previous world join. This primarily affects instance portal transitions in multiplayer.
+
+### Error Pattern (Client-Side)
+
+```
+System.InvalidOperationException: Cannot start a fade out while a fade completion callback is pending.
+   at HytaleClient!<BaseAddress>+0x1f22cf
+   at HytaleClient!<BaseAddress>+0x1e7383
+   at HytaleClient!<BaseAddress>+0x68448b
+```
+
+### Server-Side Symptoms
+
+After the client crash, the server logs show cleanup failures:
+
+```
+[SEVERE] [ChunkStore] Failed to generate chunk! 87, -84
+java.util.concurrent.CompletionException: java.lang.IllegalThreadStateException:
+    World thread is not accepting tasks: instance-Portals_Taiga-...
+```
+
+### Frequency
+
+- Common in **multiplayer** (2+ players online)
+- Rare but possible in single player
+- Occurs when entering instance portals (dungeons, caves)
+- More likely during slow instance generation (~5+ seconds)
+
+### Reproduction Steps
+
+1. Join server with multiple players
+2. Open an instance portal (taiga dungeon, etc.)
+3. Enter the portal
+4. Wait during the fade-to-black loading screen
+5. Sometimes crashes with fade callback error
+
+### Technical Analysis
+
+#### Timeline from Logs
+
+| Timestamp | Event |
+|-----------|-------|
+| 02:08:24.0038 | First `JoinWorldPacket` - FadeInOut starts |
+| 02:08:24.1659 | `PrepareJoiningWorld()` begins |
+| 02:08:44.4416 | `OnWorldJoined()` completes (**20 seconds later!**) |
+| 02:08:44.7557 | **Second `JoinWorldPacket` received immediately** |
+| 02:08:44.7786 | ProcessJoinWorldPacket tries to start another fade |
+| 02:08:45.3345 | **CRASH** - Fade callback still pending |
+
+#### Root Cause
+
+The client's fade system is **not reentrant**:
+
+1. First world join triggers fade-out animation with a completion callback
+2. Client takes ~20 seconds to load instance world (generation, asset loading)
+3. `OnWorldJoined()` fires, triggering fade-in
+4. Player immediately enters portal in the instance
+5. Server sends second `JoinWorldPacket`
+6. Client tries to start new fade-out while previous callback is pending
+7. `InvalidOperationException` crashes the client
+
+#### Pseudocode of Client Bug
+
+```csharp
+// HytaleClient fade system (hypothetical)
+public void StartFadeOut(Action onComplete) {
+    if (pendingCallback != null) {
+        // BUG: Should queue the fade or wait, not throw
+        throw new InvalidOperationException(
+            "Cannot start a fade out while a fade completion callback is pending."
+        );
+    }
+    pendingCallback = onComplete;
+    // Start fade animation...
+}
+```
+
+### Why Plugin-Level Fix Is Impossible
+
+| Approach | Why It Fails |
+|----------|--------------|
+| Intercept JoinWorldPacket | Packet is sent from server, but crash is client-side |
+| Delay portal activation | Would need client mod - can't modify client |
+| Modify fade system | Client code, not accessible to server plugins |
+
+### Potential Server-Side Mitigation
+
+While we cannot fix the client bug, we may be able to **reduce the likelihood** by:
+
+1. **Rate-limit JoinWorldPackets per player** - Track last send time, add minimum delay
+2. **Track player transfer state** - Block portal interactions while mid-transfer
+3. **Delay ClientReady response** - Give client more time to finish fade
+
+**Note:** These are mitigations, not fixes. The underlying client bug remains.
+
+### Suggested Fix for Hytale (Client)
+
+#### Option A: Queue Fade Requests
+
+```csharp
+public void StartFadeOut(Action onComplete) {
+    if (pendingCallback != null) {
+        // Queue this fade request instead of throwing
+        pendingFadeQueue.Enqueue(new FadeRequest(FadeType.Out, onComplete));
+        return;
+    }
+    pendingCallback = onComplete;
+    // Start fade animation...
+}
+```
+
+#### Option B: Cancel Previous Fade
+
+```csharp
+public void StartFadeOut(Action onComplete) {
+    if (pendingCallback != null) {
+        // Cancel previous fade and invoke its callback immediately
+        var previousCallback = pendingCallback;
+        pendingCallback = null;
+        previousCallback?.Invoke();
+    }
+    pendingCallback = onComplete;
+    // Start fade animation...
+}
+```
+
+#### Option C: Wait for Pending Fade
+
+```csharp
+public async void StartFadeOut(Action onComplete) {
+    // Wait for any pending fade to complete
+    while (pendingCallback != null) {
+        await Task.Yield();
+    }
+    pendingCallback = onComplete;
+    // Start fade animation...
+}
+```
+
+### Related Issues
+
+- **GitHub Issue:** [#39](https://github.com/John-Willikers/hyfixes/issues/39)
+- **Reporter:** Community bug report
+- **Hytale Version:** 2026.01.17-4b0f30090
+
+---
+
+## 14. InteractionChain Remove Out of Order (MEDIUM)
+
+> **STATUS: PLANNED** - Fix planned for HyFixes Early Plugin v1.10.0
+
+### Summary
+
+Hytale's `InteractionChain.removeInteractionEntry()` throws an `IllegalArgumentException` when trying to remove an interaction entry out of order. This kicks players during rapid disconnects or when interaction state becomes inconsistent.
+
+### Error Pattern
+
+```
+java.lang.IllegalArgumentException: Trying to remove out of order
+    at com.hypixel.hytale.server.core.entity.InteractionChain.removeInteractionEntry(InteractionChain.java:...)
+```
+
+### Frequency
+
+- Sporadic, more common with high-latency connections
+- Occurs during rapid player disconnects/reconnects
+- Can happen during interaction chain cleanup
+
+### Technical Analysis
+
+#### Affected Class
+`com.hypixel.hytale.server.core.entity.InteractionChain`
+
+#### Affected Method
+`removeInteractionEntry(InteractionManager manager, int index)`
+
+#### Method Signature (from bytecode)
+```
+public void removeInteractionEntry(Lcom/hypixel/hytale/server/core/entity/InteractionManager;I)V
+```
+
+#### Root Cause
+
+The method enforces strict FIFO (First-In-First-Out) removal order. When network issues or rapid state changes cause entries to be removed out of sequence, the validation throws:
+
+```java
+public void removeInteractionEntry(InteractionManager manager, int index) {
+    // Validation that throws if removal isn't in expected order
+    if (/* index doesn't match expected removal order */) {
+        throw new IllegalArgumentException("Trying to remove out of order");
+    }
+    // ... actual removal logic
+}
+```
+
+### Why Plugin-Level Fix Is Impossible
+
+| Approach | Why It Fails |
+|----------|--------------|
+| Hook removal calls | Called internally by Hytale code, no plugin hook point |
+| Track removal order | State is internal to InteractionChain |
+| Reset on error | Would cause worse interaction desync |
+
+### HyFixes Bytecode Fix (Planned)
+
+The early plugin will wrap `removeInteractionEntry()` in a try-catch to catch `IllegalArgumentException` and log instead of crashing:
+
+```java
+// Transformed method
+public void removeInteractionEntry(InteractionManager mgr, int index) {
+    try {
+        // Original method body
+    } catch (IllegalArgumentException e) {
+        LOGGER.warn("[HyFixes] Suppressed out-of-order removal: {}", e.getMessage());
+        // Return gracefully instead of crashing
+    }
+}
+```
+
+### Related Issues
+
+- **GitHub Issue:** [#40](https://github.com/John-Willikers/hyfixes/issues/40)
+- **Related Bug:** Part of the broader InteractionChain sync issues (see Bug #1, #3)
+
+---
+
+## 15. InteractionManager Client Timeout (MEDIUM)
+
+> **STATUS: PLANNED** - Fix planned for HyFixes Early Plugin v1.10.0
+
+### Summary
+
+Hytale's `InteractionManager.serverTick()` throws a `RuntimeException` when a client takes too long to send `clientData`. This kicks players during network lag spikes or when the client is busy processing.
+
+### Error Pattern
+
+```
+java.lang.RuntimeException: Client took too long to send clientData for entity ...
+    at com.hypixel.hytale.server.core.entity.InteractionManager.serverTick(InteractionManager.java:...)
+```
+
+### Frequency
+
+- Common during lag spikes
+- More frequent on busy servers with many players
+- Occurs when clients are loading assets or processing world data
+
+### Technical Analysis
+
+#### Affected Class
+`com.hypixel.hytale.server.core.entity.InteractionManager`
+
+#### Affected Method
+`serverTick(Ref<EntityStore> entityRef, InteractionChain chain, long currentTick)`
+
+#### Method Signature (from bytecode)
+```
+private Lcom/hypixel/hytale/server/core/entity/InteractionSyncData;serverTick(Lcom/hypixel/hytale/component/Ref;Lcom/hypixel/hytale/server/core/entity/InteractionChain;J)Lcom/hypixel/hytale/server/core/entity/InteractionSyncData;
+```
+
+#### Root Cause
+
+The `serverTick()` method enforces a strict timeout window for client responses. When the client doesn't respond in time (due to network latency, client-side lag, or slow processing), the method throws a `RuntimeException`:
+
+```java
+private InteractionSyncData serverTick(...) {
+    // Check if client response is overdue
+    if (/* timeout exceeded */) {
+        throw new RuntimeException(
+            "Client took too long to send clientData for entity " + entityId
+        );
+    }
+    // ... normal processing
+}
+```
+
+### Why Plugin-Level Fix Is Impossible
+
+| Approach | Why It Fails |
+|----------|--------------|
+| Intercept tick | Internal method, not exposed to plugins |
+| Extend timeout | Value is hardcoded, not configurable |
+| Track client latency | No plugin API for individual interaction timeouts |
+
+### HyFixes Bytecode Fix (Planned)
+
+The early plugin will create a new `InteractionManagerTransformer` that wraps the timeout check in a try-catch:
+
+```java
+// Transformed method
+private InteractionSyncData serverTick(...) {
+    try {
+        // Original timeout check
+        if (/* timeout exceeded */) {
+            throw new RuntimeException("Client took too long...");
+        }
+        // ... normal processing
+    } catch (RuntimeException e) {
+        if (e.getMessage() != null && e.getMessage().contains("Client took too long")) {
+            LOGGER.warn("[HyFixes] Suppressed client timeout: {}", e.getMessage());
+            // Cancel interaction gracefully instead of crashing
+            return null;
+        }
+        throw e; // Re-throw if different exception
+    }
+}
+```
+
+### Related Issues
+
+- **GitHub Issue:** [#40](https://github.com/John-Willikers/hyfixes/issues/40)
+- **Related Bug:** Part of the broader InteractionChain sync issues (see Bug #1, #3)
 
 ---
 

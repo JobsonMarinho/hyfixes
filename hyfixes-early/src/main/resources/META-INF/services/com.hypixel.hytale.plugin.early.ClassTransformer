@@ -1,4 +1,5 @@
 com.hyfixes.early.InteractionChainTransformer
+com.hyfixes.early.InteractionManagerTransformer
 com.hyfixes.early.WorldTransformer
 com.hyfixes.early.SpawnReferenceSystemsTransformer
 com.hyfixes.early.BeaconSpawnControllerTransformer
@@ -14,3 +15,5 @@ com.hyfixes.early.UUIDSystemTransformer
 com.hyfixes.early.TickingThreadTransformer
 com.hyfixes.early.UniverseTransformer
 com.hyfixes.early.PlayerSystemsTransformer
+com.hyfixes.early.LivingEntityTransformer
+com.hyfixes.early.SetMemoriesCapacityTransformer

@@ -147,6 +147,7 @@ public class HyFixesConfig {
      */
     public static class TransformersConfig {
         public boolean interactionChain = true;
+        public boolean interactionManager = true;
         public boolean world = true;
         public boolean spawnReferenceSystems = true;
         public boolean beaconSpawnController = true;

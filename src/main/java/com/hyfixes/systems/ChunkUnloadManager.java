@@ -631,9 +631,12 @@ public class ChunkUnloadManager {
             System.gc();
             System.runFinalization();
             System.gc();
-            plugin.getLogger().at(Level.INFO).log(
-                "[ChunkUnloadManager] Forced double GC (attempt #" + totalUnloadAttempts.get() + ")"
-            );
+            // Only log GC activity when verbose logging is enabled (Issue #42)
+            if (ConfigManager.getInstance().isVerbose()) {
+                plugin.getLogger().at(Level.INFO).log(
+                    "[ChunkUnloadManager] Forced double GC (cycle #" + (totalUnloadAttempts.get() / gcEveryNAttempts) + ")"
+                );
+            }
         }
 
         methodsCalled.addAndGet(callCount);

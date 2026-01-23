@@ -177,3 +177,69 @@ jobs:
               -d "$PAYLOAD" \
               "$DISCORD_WEBHOOK"
           fi
+
+      # ModTale uploads - disabled until projects are approved on ModTale
+      # - name: Upload Runtime Plugin to ModTale
+      #   if: success()
+      #   env:
+      #     MODTALE_API_KEY: ${{ secrets.MODTALE_API_KEY }}
+      #     MODTALE_PROJECT_ID: ${{ secrets.MODTALE_RUNTIME_PROJECT_ID }}
+      #   run: |
+      #     if [ -n "$MODTALE_API_KEY" ] && [ -n "$MODTALE_PROJECT_ID" ]; then
+      #       echo "Uploading hyfixes-${VERSION}.jar to ModTale..."
+      #
+      #       # Truncate changelog for ModTale (if needed)
+      #       CHANGELOG_CONTENT=$(echo "${{ steps.changelog.outputs.content }}" | head -c 2000)
+      #
+      #       RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+      #         "https://api.modtale.net/api/v1/projects/${MODTALE_PROJECT_ID}/versions" \
+      #         -H "X-MODTALE-KEY: ${MODTALE_API_KEY}" \
+      #         -F "file=@dist/hyfixes-${VERSION}.jar" \
+      #         -F "versionNumber=${VERSION}" \
+      #         -F "gameVersions=latest" \
+      #         -F "changelog=${CHANGELOG_CONTENT}" \
+      #         -F "channel=RELEASE")
+      #
+      #       HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+      #       BODY=$(echo "$RESPONSE" | sed '$d')
+      #
+      #       if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+      #         echo "✅ Runtime plugin uploaded successfully to ModTale"
+      #       else
+      #         echo "⚠️ ModTale upload failed (HTTP $HTTP_CODE): $BODY"
+      #       fi
+      #     else
+      #       echo "⏭️ Skipping ModTale upload - secrets not configured"
+      #     fi
+      #
+      # - name: Upload Early Plugin to ModTale
+      #   if: success()
+      #   env:
+      #     MODTALE_API_KEY: ${{ secrets.MODTALE_API_KEY }}
+      #     MODTALE_PROJECT_ID: ${{ secrets.MODTALE_EARLY_PROJECT_ID }}
+      #   run: |
+      #     if [ -n "$MODTALE_API_KEY" ] && [ -n "$MODTALE_PROJECT_ID" ]; then
+      #       echo "Uploading hyfixes-early-${VERSION}.jar to ModTale..."
+      #
+      #       CHANGELOG_CONTENT=$(echo "${{ steps.changelog.outputs.content }}" | head -c 2000)
+      #
+      #       RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+      #         "https://api.modtale.net/api/v1/projects/${MODTALE_PROJECT_ID}/versions" \
+      #         -H "X-MODTALE-KEY: ${MODTALE_API_KEY}" \
+      #         -F "file=@dist/hyfixes-early-${VERSION}.jar" \
+      #         -F "versionNumber=${VERSION}" \
+      #         -F "gameVersions=latest" \
+      #         -F "changelog=${CHANGELOG_CONTENT}" \
+      #         -F "channel=RELEASE")
+      #
+      #       HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+      #       BODY=$(echo "$RESPONSE" | sed '$d')
+      #
+      #       if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+      #         echo "✅ Early plugin uploaded successfully to ModTale"
+      #       else
+      #         echo "⚠️ ModTale upload failed (HTTP $HTTP_CODE): $BODY"
+      #       fi
+      #     else
+      #       echo "⏭️ Skipping ModTale upload - secrets not configured"
+      #     fi
