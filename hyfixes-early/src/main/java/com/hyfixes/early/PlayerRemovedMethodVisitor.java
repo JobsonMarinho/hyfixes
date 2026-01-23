@@ -194,6 +194,9 @@ public class PlayerRemovedMethodVisitor extends MethodVisitor {
 
     @Override
     public void visitTryCatchBlock(Label start, Label end, Label handler, String type) {
+        if (inBroadcastCall) {
+            return;
+        }
         target.visitTryCatchBlock(start, end, handler, type);
     }
 
